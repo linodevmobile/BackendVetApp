@@ -1,0 +1,233 @@
+{
+  "info": {
+    "name": "BackendVetApp",
+    "description": "API para gestión de historias clínicas veterinarias.\n\nRecibe audios de consultas veterinarias, los transcribe y extrae información clínica estructurada usando IA.\n\n## Flujo\n1. Enviar audio + sección\n2. El backend sube el audio a Supabase Storage\n3. Transcribe con OpenAI (gpt-4o-transcribe)\n4. Procesa con GPT-4o-mini según la sección\n5. Guarda en Supabase DB\n6. Devuelve respuesta completa\n\n## Uso\n- En cada request, ve a Body > form-data\n- Campo `audio`: selecciona un archivo de audio (mp3, wav, m4a)\n- Campo `section`: el nombre de la sección clínica\n- Campo `consultation_id` (opcional): para continuar una consulta existente",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://backendvetapp.onrender.com"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/",
+        "description": "Verifica que el servidor está funcionando. Devuelve la lista de endpoints y secciones válidas."
+      }
+    },
+    {
+      "name": "1. Anamnesis",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa la anamnesis del paciente.\n\n## Qué decir en el audio\nHistoria clínica: enfermedades previas, si está esterilizado, si convive con otros animales, partos, cirugías previas, vacunación, tratamientos recientes, viajes, comportamiento, motivo de consulta, desparasitación.\n\n## Salida esperada\n```json\n{\n  \"enfermedades_previas\": \"\",\n  \"esterilizado\": \"\",\n  \"convive_con_otros_animales\": \"\",\n  \"numero_partos\": \"\",\n  \"cirugias_previas\": \"\",\n  \"vacunacion\": \"\",\n  \"tratamientos_recientes\": \"\",\n  \"viajes_recientes\": \"\",\n  \"comportamiento\": \"\",\n  \"motivo_consulta\": \"\",\n  \"desparasitacion\": \"\"\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "anamnesis",
+              "type": "text",
+              "description": "Sección: anamnesis"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente para continuar agregando secciones"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. Examen Físico",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa el examen físico del paciente.\n\n## Qué decir en el audio\nObservaciones por sistemas: mucosas, órganos de los sentidos, piel/pelaje, ganglios linfáticos, sistema digestivo, respiratorio, endocrino, músculo esquelético, nervioso, urinario, reproductivo, palpación rectal.\n\n## Salida esperada\n```json\n{\n  \"mucosas\": \"\",\n  \"organos_sentidos\": \"\",\n  \"piel_pelaje\": \"\",\n  \"ganglios_linfaticos\": \"\",\n  \"sistema_digestivo\": \"\",\n  \"sistema_respiratorio\": \"\",\n  \"sistema_endocrino\": \"\",\n  \"sistema_musculo_esqueletico\": \"\",\n  \"sistema_nervioso\": \"\",\n  \"sistema_urinario\": \"\",\n  \"sistema_reproductivo\": \"\",\n  \"palpacion_rectal\": \"\",\n  \"otros\": \"\"\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "examen_fisico",
+              "type": "text",
+              "description": "Sección: examen_fisico"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Abordaje Diagnóstico",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa el abordaje diagnóstico completo: problemas, diagnósticos diferenciales y lista maestra.\n\n## Qué decir en el audio\nLista de problemas identificados, diagnósticos diferenciales considerados y lista maestra priorizada.\n\n## Salida esperada\n```json\n{\n  \"problemas\": [\n    \"Problema 1\",\n    \"Problema 2\"\n  ],\n  \"diagnosticos_diferenciales\": [\n    \"Diagnóstico diferencial 1\",\n    \"Diagnóstico diferencial 2\"\n  ],\n  \"lista_maestra\": [\n    \"Problema priorizado 1\",\n    \"Problema priorizado 2\"\n  ]\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "abordaje_diagnostico",
+              "type": "text",
+              "description": "Sección: abordaje_diagnostico"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Diagnóstico Presuntivo",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa el diagnóstico presuntivo con su justificación clínica.\n\n## Qué decir en el audio\nEl diagnóstico presuntivo y la justificación clínica que lo sustenta.\n\n## Salida esperada\n```json\n{\n  \"diagnostico_presuntivo\": \"\",\n  \"justificacion\": \"\"\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "diagnostico_presuntivo",
+              "type": "text",
+              "description": "Sección: diagnostico_presuntivo"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. Diagnóstico Definitivo",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa el diagnóstico definitivo con los hallazgos que lo confirman.\n\n## Qué decir en el audio\nEl diagnóstico definitivo y los resultados o hallazgos confirmatorios (laboratorio, imagen, etc.).\n\n## Salida esperada\n```json\n{\n  \"diagnostico_definitivo\": \"\",\n  \"hallazgos_confirmatorios\": \"\"\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "diagnostico_definitivo",
+              "type": "text",
+              "description": "Sección: diagnostico_definitivo"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. Plan Terapéutico",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa el plan terapéutico del paciente.\n\n## Qué decir en el audio\nMedicamentos, dosis, frecuencias, indicaciones de manejo en casa, controles de seguimiento.\n\n## Salida esperada\n```json\n{\n  \"plan_tratamiento\": [\n    \"Iniciar antibiótico de amplio espectro por siete días\",\n    \"Administrar antiinflamatorio por cinco días\",\n    \"Controlar evolución en 72 horas\"\n  ]\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "plan_terapeutico",
+              "type": "text",
+              "description": "Sección: plan_terapeutico"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "7. Pronóstico y Evolución",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/consultation/process",
+        "description": "Procesa el pronóstico y evolución del paciente.\n\n## Qué decir en el audio\nEl pronóstico del caso (favorable, reservado, desfavorable) y la evolución observada.\n\n## Salida esperada\n```json\n{\n  \"pronostico\": \"\",\n  \"evolucion\": \"\"\n}\n```",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "audio",
+              "type": "file",
+              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+            },
+            {
+              "key": "section",
+              "value": "pronostico_evolucion",
+              "type": "text",
+              "description": "Sección: pronostico_evolucion"
+            },
+            {
+              "key": "consultation_id",
+              "value": "",
+              "type": "text",
+              "description": "(Opcional) ID de consulta existente"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
