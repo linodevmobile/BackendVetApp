@@ -1,13 +1,29 @@
 {
   "info": {
-    "name": "BackendVetApp",
-    "description": "API para gestión de historias clínicas veterinarias.\n\nRecibe audios de consultas veterinarias, los transcribe y extrae información clínica estructurada usando IA.\n\n## Flujo\n1. Enviar audio + sección\n2. El backend sube el audio a Supabase Storage\n3. Transcribe con OpenAI (gpt-4o-transcribe)\n4. Procesa con GPT-4o-mini según la sección\n5. Guarda en Supabase DB\n6. Devuelve respuesta completa\n\n## Uso\n- En cada request, ve a Body > form-data\n- Campo `audio`: selecciona un archivo de audio (mp3, wav, m4a)\n- Campo `section`: el nombre de la sección clínica\n- Campo `consultation_id` (opcional): para continuar una consulta existente",
+    "name": "BackendVetApp v2",
+    "description": "API para gestión de historias clínicas veterinarias.\n\nSeparación entre captura de datos por IA (borradores) y persistencia clínica estructurada.\n\n## Flujo MVP\n1. Login o Registrar veterinario (`POST /auth/login` o `POST /auth/register`)\n2. Crear paciente (`POST /patients`)\n3. Procesar primera sección con audio → crea consulta automáticamente (`POST /consultation/process`)\n4. Continuar procesando secciones con el `consultation_id` devuelto\n5. Cerrar consulta con resultado (`PATCH /consultation/:id/close`)\n\n## Notas\n- `patient_id` y `veterinarian_id` son requeridos en la primera llamada a `/consultation/process` (si no se envía `consultation_id`)\n- Cada sección se guarda como borrador en `consultation_drafts` (upsert por consulta+sección)\n- Las secciones válidas: anamnesis, examen_fisico, abordaje_diagnostico, diagnostico_presuntivo, diagnostico_definitivo, plan_terapeutico, pronostico_evolucion",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "base_url",
-      "value": "https://backendvetapp.onrender.com"
+      "value": "{{base_url}}"
+    },
+    {
+      "key": "patient_id",
+      "value": ""
+    },
+    {
+      "key": "veterinarian_id",
+      "value": ""
+    },
+    {
+      "key": "consultation_id",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
     }
   ],
   "item": [
@@ -20,214 +36,477 @@
       }
     },
     {
-      "name": "1. Anamnesis",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa la anamnesis del paciente.\n\n## Qué decir en el audio\nHistoria clínica: enfermedades previas, si está esterilizado, si convive con otros animales, partos, cirugías previas, vacunación, tratamientos recientes, viajes, comportamiento, motivo de consulta, desparasitación.\n\n## Salida esperada\n```json\n{\n  \"enfermedades_previas\": \"\",\n  \"esterilizado\": \"\",\n  \"convive_con_otros_animales\": \"\",\n  \"numero_partos\": \"\",\n  \"cirugias_previas\": \"\",\n  \"vacunacion\": \"\",\n  \"tratamientos_recientes\": \"\",\n  \"viajes_recientes\": \"\",\n  \"comportamiento\": \"\",\n  \"motivo_consulta\": \"\",\n  \"desparasitacion\": \"\"\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
+      "name": "Auth",
+      "description": "Autenticación y registro de veterinarios",
+      "item": [
+        {
+          "name": "Registrar Veterinario",
+          "event": [
             {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "anamnesis",
-              "type": "text",
-              "description": "Sección: anamnesis"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente para continuar agregando secciones"
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('veterinarian_id', res.veterinarian.id);",
+                  "  console.log('veterinarian_id guardado:', res.veterinarian.id);",
+                  "}"
+                ]
+              }
             }
-          ]
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/register",
+            "description": "Registra un nuevo veterinario. Crea usuario en Supabase Auth y perfil en tabla veterinarians.\n\nCampos requeridos: email, password, full_name\n\nGuarda automáticamente el `veterinarian_id` en las variables de colección.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuevo.vet@vetapp.com\",\n  \"password\": \"MiPassword123!\",\n  \"full_name\": \"Dr. Nuevo Veterinario\",\n  \"license_number\": \"MV-67890\",\n  \"phone\": \"+573001112233\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('veterinarian_id', res.veterinarian.id);",
+                  "  pm.collectionVariables.set('access_token', res.session.access_token);",
+                  "  console.log('veterinarian_id guardado:', res.veterinarian.id);",
+                  "  console.log('access_token guardado');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "description": "Inicia sesión con email y password.\n\nDevuelve session (tokens) y perfil del veterinario.\n\nGuarda automáticamente `veterinarian_id` y `access_token` en las variables de colección.\n\n## Usuario de prueba\n- Email: vet.test@vetapp.com\n- Password: TestVet2026!",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"vet.test@vetapp.com\",\n  \"password\": \"TestVet2026!\"\n}"
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "2. Examen Físico",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa el examen físico del paciente.\n\n## Qué decir en el audio\nObservaciones por sistemas: mucosas, órganos de los sentidos, piel/pelaje, ganglios linfáticos, sistema digestivo, respiratorio, endocrino, músculo esquelético, nervioso, urinario, reproductivo, palpación rectal.\n\n## Salida esperada\n```json\n{\n  \"mucosas\": \"\",\n  \"organos_sentidos\": \"\",\n  \"piel_pelaje\": \"\",\n  \"ganglios_linfaticos\": \"\",\n  \"sistema_digestivo\": \"\",\n  \"sistema_respiratorio\": \"\",\n  \"sistema_endocrino\": \"\",\n  \"sistema_musculo_esqueletico\": \"\",\n  \"sistema_nervioso\": \"\",\n  \"sistema_urinario\": \"\",\n  \"sistema_reproductivo\": \"\",\n  \"palpacion_rectal\": \"\",\n  \"otros\": \"\"\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
+      "name": "Veterinarians",
+      "description": "Consulta de veterinarios registrados",
+      "item": [
+        {
+          "name": "Listar Veterinarios",
+          "event": [
             {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "examen_fisico",
-              "type": "text",
-              "description": "Sección: examen_fisico"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente"
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  if (res.length > 0) {",
+                  "    pm.collectionVariables.set('veterinarian_id', res[0].id);",
+                  "    console.log('veterinarian_id guardado:', res[0].id);",
+                  "  }",
+                  "}"
+                ]
+              }
             }
-          ]
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/veterinarians",
+            "description": "Lista todos los veterinarios. Guarda automáticamente el ID del primer veterinario en las variables de colección."
+          }
+        },
+        {
+          "name": "Obtener Veterinario",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/veterinarians/{{veterinarian_id}}",
+            "description": "Obtiene un veterinario por su ID."
+          }
         }
-      }
+      ]
     },
     {
-      "name": "3. Abordaje Diagnóstico",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa el abordaje diagnóstico completo: problemas, diagnósticos diferenciales y lista maestra.\n\n## Qué decir en el audio\nLista de problemas identificados, diagnósticos diferenciales considerados y lista maestra priorizada.\n\n## Salida esperada\n```json\n{\n  \"problemas\": [\n    \"Problema 1\",\n    \"Problema 2\"\n  ],\n  \"diagnosticos_diferenciales\": [\n    \"Diagnóstico diferencial 1\",\n    \"Diagnóstico diferencial 2\"\n  ],\n  \"lista_maestra\": [\n    \"Problema priorizado 1\",\n    \"Problema priorizado 2\"\n  ]\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
+      "name": "Patients",
+      "description": "CRUD de pacientes (mascotas)",
+      "item": [
+        {
+          "name": "Crear Paciente",
+          "event": [
             {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "abordaje_diagnostico",
-              "type": "text",
-              "description": "Sección: abordaje_diagnostico"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente"
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('patient_id', res.id);",
+                  "  console.log('patient_id guardado:', res.id);",
+                  "}"
+                ]
+              }
             }
-          ]
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/patients",
+            "description": "Crea un nuevo paciente (mascota).\n\nCampos requeridos: name, species, sex, owner_name\n\nGuarda automáticamente el `patient_id` en las variables de colección.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Luna\",\n  \"species\": \"canino\",\n  \"breed\": \"Golden Retriever\",\n  \"sex\": \"female\",\n  \"date_of_birth\": \"2020-03-15\",\n  \"weight_kg\": 28.5,\n  \"microchip\": \"985112345678901\",\n  \"owner_name\": \"Carlos Pérez\",\n  \"owner_phone\": \"+573001234567\",\n  \"owner_email\": \"carlos@email.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Listar Pacientes",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/patients",
+            "description": "Lista todos los pacientes ordenados por fecha de creación (más reciente primero)."
+          }
+        },
+        {
+          "name": "Obtener Paciente",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/patients/{{patient_id}}",
+            "description": "Obtiene un paciente por su ID."
+          }
+        },
+        {
+          "name": "Actualizar Paciente",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/patients/{{patient_id}}",
+            "description": "Actualiza campos del paciente. Solo enviar los campos que cambian.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight_kg\": 29.0\n}"
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "4. Diagnóstico Presuntivo",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa el diagnóstico presuntivo con su justificación clínica.\n\n## Qué decir en el audio\nEl diagnóstico presuntivo y la justificación clínica que lo sustenta.\n\n## Salida esperada\n```json\n{\n  \"diagnostico_presuntivo\": \"\",\n  \"justificacion\": \"\"\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
+      "name": "Consultation - Process Sections",
+      "description": "Procesamiento de secciones clínicas por audio.\n\nFlujo:\n1. Primera sección: enviar patient_id + veterinarian_id → crea consulta\n2. Siguientes secciones: enviar consultation_id devuelto",
+      "item": [
+        {
+          "name": "1. Anamnesis (crea consulta)",
+          "event": [
             {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "diagnostico_presuntivo",
-              "type": "text",
-              "description": "Sección: diagnostico_presuntivo"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente"
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const res = pm.response.json();",
+                  "  pm.collectionVariables.set('consultation_id', res.consultation_id);",
+                  "  console.log('consultation_id guardado:', res.consultation_id);",
+                  "}"
+                ]
+              }
             }
-          ]
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa la anamnesis del paciente. Primera sección → crea la consulta.\n\nGuarda automáticamente el `consultation_id` en las variables de colección.\n\n## Qué decir en el audio\nHistoria clínica: enfermedades previas, esterilización, convivencia con otros animales, partos, cirugías previas, vacunación, tratamientos recientes, viajes, comportamiento, motivo de consulta, desparasitación.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "anamnesis",
+                  "type": "text",
+                  "description": "Sección: anamnesis"
+                },
+                {
+                  "key": "patient_id",
+                  "value": "{{patient_id}}",
+                  "type": "text",
+                  "description": "ID del paciente (requerido si no se envía consultation_id)"
+                },
+                {
+                  "key": "veterinarian_id",
+                  "value": "{{veterinarian_id}}",
+                  "type": "text",
+                  "description": "ID del veterinario (requerido si no se envía consultation_id)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Examen Físico",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa el examen físico del paciente.\n\n## Qué decir en el audio\nObservaciones por sistemas: mucosas, órganos de los sentidos, piel/pelaje, ganglios linfáticos, sistema digestivo, respiratorio, endocrino, músculo esquelético, nervioso, urinario, reproductivo, palpación rectal.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "examen_fisico",
+                  "type": "text",
+                  "description": "Sección: examen_fisico"
+                },
+                {
+                  "key": "consultation_id",
+                  "value": "{{consultation_id}}",
+                  "type": "text",
+                  "description": "ID de consulta existente"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Abordaje Diagnóstico",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa el abordaje diagnóstico: problemas, diagnósticos diferenciales y lista maestra.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "abordaje_diagnostico",
+                  "type": "text",
+                  "description": "Sección: abordaje_diagnostico"
+                },
+                {
+                  "key": "consultation_id",
+                  "value": "{{consultation_id}}",
+                  "type": "text",
+                  "description": "ID de consulta existente"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4. Diagnóstico Presuntivo",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa el diagnóstico presuntivo con su justificación clínica.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "diagnostico_presuntivo",
+                  "type": "text",
+                  "description": "Sección: diagnostico_presuntivo"
+                },
+                {
+                  "key": "consultation_id",
+                  "value": "{{consultation_id}}",
+                  "type": "text",
+                  "description": "ID de consulta existente"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Diagnóstico Definitivo",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa el diagnóstico definitivo con los hallazgos confirmatorios.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "diagnostico_definitivo",
+                  "type": "text",
+                  "description": "Sección: diagnostico_definitivo"
+                },
+                {
+                  "key": "consultation_id",
+                  "value": "{{consultation_id}}",
+                  "type": "text",
+                  "description": "ID de consulta existente"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "6. Plan Terapéutico",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa el plan terapéutico del paciente: medicamentos, dosis, frecuencias, manejo en casa, controles.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "plan_terapeutico",
+                  "type": "text",
+                  "description": "Sección: plan_terapeutico"
+                },
+                {
+                  "key": "consultation_id",
+                  "value": "{{consultation_id}}",
+                  "type": "text",
+                  "description": "ID de consulta existente"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Pronóstico y Evolución",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/consultation/process",
+            "description": "Procesa el pronóstico y evolución del paciente.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
+                },
+                {
+                  "key": "section",
+                  "value": "pronostico_evolucion",
+                  "type": "text",
+                  "description": "Sección: pronostico_evolucion"
+                },
+                {
+                  "key": "consultation_id",
+                  "value": "{{consultation_id}}",
+                  "type": "text",
+                  "description": "ID de consulta existente"
+                }
+              ]
+            }
+          }
         }
-      }
+      ]
     },
     {
-      "name": "5. Diagnóstico Definitivo",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa el diagnóstico definitivo con los hallazgos que lo confirman.\n\n## Qué decir en el audio\nEl diagnóstico definitivo y los resultados o hallazgos confirmatorios (laboratorio, imagen, etc.).\n\n## Salida esperada\n```json\n{\n  \"diagnostico_definitivo\": \"\",\n  \"hallazgos_confirmatorios\": \"\"\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "diagnostico_definitivo",
-              "type": "text",
-              "description": "Sección: diagnostico_definitivo"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente"
+      "name": "Consultation - Management",
+      "description": "Gestión de consultas: obtener estado y cerrar.",
+      "item": [
+        {
+          "name": "Obtener Consulta",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/consultation/{{consultation_id}}",
+            "description": "Obtiene una consulta completa con todos sus borradores (consultation_drafts)."
+          }
+        },
+        {
+          "name": "Cerrar Consulta - Alta",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/consultation/{{consultation_id}}/close",
+            "description": "Cierra la consulta con resultado: alta del paciente.\n\nResultados válidos: discharge, hospitalization, deceased, referred",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": \"discharge\",\n  \"chief_complaint\": \"Vómito y diarrea de 2 días de evolución\",\n  \"primary_diagnosis\": \"Gastroenteritis aguda\"\n}"
             }
-          ]
-        }
-      }
-    },
-    {
-      "name": "6. Plan Terapéutico",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa el plan terapéutico del paciente.\n\n## Qué decir en el audio\nMedicamentos, dosis, frecuencias, indicaciones de manejo en casa, controles de seguimiento.\n\n## Salida esperada\n```json\n{\n  \"plan_tratamiento\": [\n    \"Iniciar antibiótico de amplio espectro por siete días\",\n    \"Administrar antiinflamatorio por cinco días\",\n    \"Controlar evolución en 72 horas\"\n  ]\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "plan_terapeutico",
-              "type": "text",
-              "description": "Sección: plan_terapeutico"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente"
+          }
+        },
+        {
+          "name": "Cerrar Consulta - Hospitalización",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/consultation/{{consultation_id}}/close",
+            "description": "Cierra la consulta con resultado: hospitalización.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": \"hospitalization\",\n  \"chief_complaint\": \"Decaimiento severo y anorexia\",\n  \"primary_diagnosis\": \"Parvovirus canino\"\n}"
             }
-          ]
+          }
         }
-      }
-    },
-    {
-      "name": "7. Pronóstico y Evolución",
-      "request": {
-        "method": "POST",
-        "url": "{{base_url}}/consultation/process",
-        "description": "Procesa el pronóstico y evolución del paciente.\n\n## Qué decir en el audio\nEl pronóstico del caso (favorable, reservado, desfavorable) y la evolución observada.\n\n## Salida esperada\n```json\n{\n  \"pronostico\": \"\",\n  \"evolucion\": \"\"\n}\n```",
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "audio",
-              "type": "file",
-              "description": "Archivo de audio (mp3, wav, m4a). Máx 20MB"
-            },
-            {
-              "key": "section",
-              "value": "pronostico_evolucion",
-              "type": "text",
-              "description": "Sección: pronostico_evolucion"
-            },
-            {
-              "key": "consultation_id",
-              "value": "",
-              "type": "text",
-              "description": "(Opcional) ID de consulta existente"
-            }
-          ]
-        }
-      }
+      ]
     }
   ]
 }

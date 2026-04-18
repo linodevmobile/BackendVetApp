@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { processConsultation } = require('../controllers/consultationController');
+const { processConsultation, getConsultationById, finishConsultation } = require('../controllers/consultationController');
 
 const router = express.Router();
 
@@ -19,5 +19,7 @@ const upload = multer({
 });
 
 router.post('/process', upload.single('audio'), processConsultation);
+router.get('/:id', getConsultationById);
+router.patch('/:id/close', finishConsultation);
 
 module.exports = router;

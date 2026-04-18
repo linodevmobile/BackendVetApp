@@ -1,13 +1,13 @@
 const { transcribeAudio } = require('../services/transcriptionService');
-const { getPrompt, isValidSection, VALID_SECTIONS } = require('../services/promptRouter');
+const { getPrompt, isValidSection, getDbSection, VALID_SECTIONS } = require('../services/promptRouter');
 const { processWithLLM } = require('../services/llmService');
-const { createConsultation, getConsultation, updateSection } = require('../services/stateService');
+const { createConsultation, getConsultation, closeConsultation, upsertDraft } = require('../services/stateService');
 const { uploadAudio, deleteLocalFile } = require('../services/storageService');
 const logger = require('../utils/logger');
 
 async function processConsultation(req, res) {
   const file = req.file;
-  const { section, consultation_id } = req.body;
+  const { section, consultation_id, patient_id, veterinarian_id } = req.body;
 
   // --- Validations ---
   if (!file) {
@@ -21,6 +21,12 @@ async function processConsultation(req, res) {
   if (!isValidSection(section)) {
     return res.status(400).json({
       error: `Sección inválida. Secciones válidas: ${VALID_SECTIONS.join(', ')}`,
+    });
+  }
+
+  if (!consultation_id && (!patient_id || !veterinarian_id)) {
+    return res.status(400).json({
+      error: 'Se requiere "consultation_id" o bien "patient_id" y "veterinarian_id" para crear una nueva consulta',
     });
   }
 
@@ -46,25 +52,30 @@ async function processConsultation(req, res) {
     // 5. Process with LLM
     const structuredData = await processWithLLM(prompt, transcribedText);
 
-    // 6. Create or update consultation in Supabase
+    // 6. Create or reuse consultation
     let consultationId = consultation_id;
 
     if (!consultationId) {
-      const newConsultation = await createConsultation();
+      const newConsultation = await createConsultation(patient_id, veterinarian_id);
       consultationId = newConsultation.id;
     }
 
-    // 7. Update the specific section
-    const updatedConsultation = await updateSection(consultationId, section, structuredData);
+    // 7. Upsert draft with DB enum section value
+    const dbSection = getDbSection(section);
+    const draft = await upsertDraft(consultationId, dbSection, structuredData, audioPath, transcribedText);
 
-    // 8. Return complete response
+    // 8. Get full consultation state
+    const consultation = await getConsultation(consultationId);
+
+    // 9. Return complete response
     res.json({
       consultation_id: consultationId,
       section,
       audio_path: audioPath,
       transcription: transcribedText,
       structured_data: structuredData,
-      consultation: updatedConsultation,
+      draft,
+      consultation,
     });
   } catch (error) {
     logger.error('Error al procesar consulta:', error.message);
@@ -73,4 +84,31 @@ async function processConsultation(req, res) {
   }
 }
 
-module.exports = { processConsultation };
+async function getConsultationById(req, res) {
+  try {
+    const consultation = await getConsultation(req.params.id);
+    res.json(consultation);
+  } catch (error) {
+    logger.error('Error al obtener consulta:', error.message);
+    res.status(404).json({ error: 'Consulta no encontrada', details: error.message });
+  }
+}
+
+async function finishConsultation(req, res) {
+  const { id } = req.params;
+  const { result, chief_complaint, primary_diagnosis } = req.body;
+
+  if (!result) {
+    return res.status(400).json({ error: 'Se requiere el campo "result" (discharge, hospitalization, deceased, referred)' });
+  }
+
+  try {
+    const consultation = await closeConsultation(id, result, chief_complaint, primary_diagnosis);
+    res.json(consultation);
+  } catch (error) {
+    logger.error('Error al finalizar consulta:', error.message);
+    res.status(500).json({ error: 'Error al finalizar la consulta', details: error.message });
+  }
+}
+
+module.exports = { processConsultation, getConsultationById, finishConsultation };

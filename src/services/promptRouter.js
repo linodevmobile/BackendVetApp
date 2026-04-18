@@ -6,6 +6,7 @@ const DEFINITIVE_DIAGNOSIS_PROMPT = require('../prompts/definitive-diagnosisProm
 const TREATMENT_PLAN_PROMPT = require('../prompts/treatment-planPrompt');
 const PROGNOSIS_PROMPT = require('../prompts/prognosisPrompt');
 
+// API keys (Spanish) → prompt mapping
 const PROMPTS = {
   anamnesis: ANAMNESIS_PROMPT,
   examen_fisico: PHYSICAL_EXAM_PROMPT,
@@ -14,6 +15,17 @@ const PROMPTS = {
   diagnostico_definitivo: DEFINITIVE_DIAGNOSIS_PROMPT,
   plan_terapeutico: TREATMENT_PLAN_PROMPT,
   pronostico_evolucion: PROGNOSIS_PROMPT,
+};
+
+// API keys (Spanish) → DB enum values (English)
+const SECTION_TO_DB = {
+  anamnesis: 'anamnesis',
+  examen_fisico: 'physical_exam',
+  abordaje_diagnostico: 'diagnostic_approach',
+  diagnostico_presuntivo: 'presumptive_diagnosis',
+  diagnostico_definitivo: 'definitive_diagnosis',
+  plan_terapeutico: 'treatment_plan',
+  pronostico_evolucion: 'prognosis',
 };
 
 const VALID_SECTIONS = Object.keys(PROMPTS);
@@ -26,4 +38,8 @@ function isValidSection(section) {
   return VALID_SECTIONS.includes(section);
 }
 
-module.exports = { getPrompt, isValidSection, VALID_SECTIONS };
+function getDbSection(section) {
+  return SECTION_TO_DB[section] || null;
+}
+
+module.exports = { getPrompt, isValidSection, getDbSection, VALID_SECTIONS };
