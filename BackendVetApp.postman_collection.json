@@ -24,6 +24,7 @@
     },
     {
       "name": "Auth",
+      "description": "Registro e inicio de sesión. No requieren Bearer token. Tras login exitoso el script guarda `access_token` y `veterinarian_id` en collection vars (se usan automáticamente en el resto de endpoints).",
       "item": [
         {
           "name": "Register",
@@ -44,6 +45,7 @@
           "request": {
             "method": "POST",
             "auth": { "type": "noauth" },
+            "description": "Registra un nuevo veterinario. Crea usuario en Supabase Auth + perfil en tabla `veterinarians`.\n\n## Body JSON\n| Campo | Tipo | Requerido | Notas |\n|---|---|---|---|\n| `email` | string | sí | formato email |\n| `password` | string | sí | mínimo 6 caracteres |\n| `full_name` | string | sí | mínimo 2 caracteres |\n| `license_number` | string | no | matrícula profesional |\n| `phone` | string | no | teléfono |\n| `salutation` | string | no | saludo custom (default se genera desde `full_name`) |\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"user_id\": \"uuid\",\n    \"veterinarian\": {\n      \"id\": \"uuid\",\n      \"full_name\": \"...\",\n      \"email\": \"...\",\n      \"license_number\": \"...\",\n      \"phone\": \"...\",\n      \"salutation\": \"Dr. ...\"\n    }\n  }\n}\n```\nHTTP 201 en éxito. Si falla la creación del perfil, hace rollback del usuario Auth.",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
@@ -74,6 +76,7 @@
           "request": {
             "method": "POST",
             "auth": { "type": "noauth" },
+            "description": "Autentica veterinario. Devuelve session tokens + perfil.\n\n## Body JSON\n| Campo | Tipo | Requerido |\n|---|---|---|\n| `email` | string | sí |\n| `password` | string | sí |\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"session\": {\n      \"access_token\": \"jwt...\",\n      \"refresh_token\": \"...\",\n      \"expires_at\": 1234567890\n    },\n    \"veterinarian\": {\n      \"id\": \"uuid\",\n      \"full_name\": \"...\",\n      \"email\": \"...\",\n      \"license_number\": \"...\",\n      \"phone\": \"...\",\n      \"salutation\": \"...\"\n    }\n  }\n}\n```\nErrores: `401` credenciales inválidas, `403` usuario sin perfil veterinario.",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
@@ -86,15 +89,29 @@
     },
     {
       "name": "Veterinarians",
+      "description": "Perfil del veterinario autenticado. Requiere Bearer token.",
       "item": [
         {
           "name": "Me",
-          "request": { "method": "GET", "url": "{{base_url}}/veterinarians/me" }
+          "request": {
+            "method": "GET",
+            "description": "Devuelve perfil del veterinario dueño del token.\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"id\": \"uuid\",\n    \"full_name\": \"...\",\n    \"email\": \"...\",\n    \"license_number\": \"...\",\n    \"phone\": \"...\",\n    \"salutation\": \"Dr. ...\",\n    \"created_at\": \"ISO8601\"\n  }\n}\n```",
+            "url": "{{base_url}}/veterinarians/me"
+          }
+        },
+        {
+          "name": "Get by ID",
+          "request": {
+            "method": "GET",
+            "description": "Devuelve perfil público de otro veterinario por UUID.",
+            "url": "{{base_url}}/veterinarians/{{veterinarian_id}}"
+          }
         }
       ]
     },
     {
       "name": "Patients",
+      "description": "CRUD de pacientes + favoritos + alertas clínicas. Todo requiere Bearer token. Pacientes filtrados por veterinario autenticado.",
       "item": [
         {
           "name": "Create",
@@ -112,6 +129,7 @@
           ],
           "request": {
             "method": "POST",
+            "description": "Crea paciente asociado al veterinario autenticado. Guarda `patient_id` en collection var.\n\n## Body JSON\n| Campo | Tipo | Requerido | Valores / notas |\n|---|---|---|---|\n| `name` | string | sí | nombre del animal |\n| `species` | enum | sí | `dog` \\| `cat` \\| `exotic` |\n| `breed` | string | no | raza |\n| `sex` | enum | sí | `male` \\| `female` |\n| `date_of_birth` | string | sí* | ISO date (YYYY-MM-DD). *Debe enviarse `date_of_birth` **o** `age_years` |\n| `age_years` | number | sí* | entero 0–60. Alternativa a `date_of_birth` |\n| `weight_kg` | number | no | positivo |\n| `microchip` | string | no | |\n| `owner_name` | string | sí | dueño |\n| `owner_phone` | string | no | |\n| `owner_email` | string | no | formato email |\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"id\": \"uuid\",\n    \"name\": \"Luna\",\n    \"species\": \"dog\",\n    \"breed\": \"Labrador\",\n    \"sex\": \"female\",\n    \"age_years\": 4,\n    \"weight_kg\": 18.5,\n    \"owner_name\": \"Juan Pérez\",\n    \"veterinarian_id\": \"uuid\",\n    \"created_at\": \"ISO8601\"\n  }\n}\n```",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
@@ -124,13 +142,14 @@
           "name": "List",
           "request": {
             "method": "GET",
+            "description": "Lista pacientes del veterinario autenticado con paginación y filtros.\n\n## Query params\n| Param | Tipo | Default | Valores |\n|---|---|---|---|\n| `search` | string | — | busca por nombre paciente/dueño |\n| `filter` | enum | — | `all` \\| `today_agenda` \\| `favorites` \\| `recent` |\n| `limit` | number | 20 | 1–100 |\n| `offset` | number | 0 | paginación |\n\n## Respuesta\n```json\n{\n  \"data\": [ { /* paciente */ } ],\n  \"meta\": { \"count\": 12, \"limit\": 20, \"offset\": 0 }\n}\n```",
             "url": {
               "raw": "{{base_url}}/patients?limit=20&offset=0",
               "host": ["{{base_url}}"],
               "path": ["patients"],
               "query": [
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "filter", "value": "all", "disabled": true },
+                { "key": "search", "value": "", "disabled": true, "description": "busca en name/owner_name" },
+                { "key": "filter", "value": "all", "disabled": true, "description": "all | today_agenda | favorites | recent" },
                 { "key": "limit", "value": "20" },
                 { "key": "offset", "value": "0" }
               ]
@@ -139,12 +158,17 @@
         },
         {
           "name": "Get by ID",
-          "request": { "method": "GET", "url": "{{base_url}}/patients/{{patient_id}}" }
+          "request": {
+            "method": "GET",
+            "description": "Devuelve paciente por UUID. 404 si no existe o no pertenece al vet autenticado.",
+            "url": "{{base_url}}/patients/{{patient_id}}"
+          }
         },
         {
           "name": "Update",
           "request": {
             "method": "PATCH",
+            "description": "Actualiza paciente. Al menos un campo requerido.\n\n## Body JSON (todos opcionales)\n| Campo | Valores |\n|---|---|\n| `name` | string |\n| `species` | `dog` \\| `cat` \\| `exotic` |\n| `breed` | string |\n| `sex` | `male` \\| `female` |\n| `date_of_birth` | ISO date |\n| `weight_kg` | number > 0 |\n| `microchip` | string |\n| `owner_name` | string |\n| `owner_phone` | string |\n| `owner_email` | email |",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"weight_kg\": 19.0\n}" },
             "url": "{{base_url}}/patients/{{patient_id}}"
@@ -152,20 +176,33 @@
         },
         {
           "name": "Favorites List",
-          "request": { "method": "GET", "url": "{{base_url}}/patients/favorites" }
+          "request": {
+            "method": "GET",
+            "description": "Lista pacientes marcados como favoritos por el veterinario autenticado.",
+            "url": "{{base_url}}/patients/favorites"
+          }
         },
         {
           "name": "Favorite Add",
-          "request": { "method": "POST", "url": "{{base_url}}/patients/favorites/{{patient_id}}" }
+          "request": {
+            "method": "POST",
+            "description": "Marca paciente como favorito para el veterinario autenticado.",
+            "url": "{{base_url}}/patients/favorites/{{patient_id}}"
+          }
         },
         {
           "name": "Favorite Remove",
-          "request": { "method": "DELETE", "url": "{{base_url}}/patients/favorites/{{patient_id}}" }
+          "request": {
+            "method": "DELETE",
+            "description": "Desmarca paciente de favoritos.",
+            "url": "{{base_url}}/patients/favorites/{{patient_id}}"
+          }
         },
         {
           "name": "Alert Create",
           "request": {
             "method": "POST",
+            "description": "Crea alerta clínica para paciente (alergias, condiciones crónicas, etc.).\n\n## Body JSON\n| Campo | Tipo | Requerido | Valores |\n|---|---|---|---|\n| `label` | string | sí | descripción corta |\n| `severity` | enum | no | `info` \\| `warning` \\| `critical` (default `info`) |",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"label\": \"Alergia a penicilina\",\n  \"severity\": \"warning\"\n}" },
             "url": "{{base_url}}/patients/{{patient_id}}/alerts"
@@ -173,16 +210,41 @@
         },
         {
           "name": "Alert List",
-          "request": { "method": "GET", "url": "{{base_url}}/patients/{{patient_id}}/alerts" }
+          "request": {
+            "method": "GET",
+            "description": "Lista alertas activas del paciente.",
+            "url": "{{base_url}}/patients/{{patient_id}}/alerts"
+          }
+        },
+        {
+          "name": "Alert Deactivate",
+          "request": {
+            "method": "PATCH",
+            "description": "Desactiva alerta (soft disable). Requiere `id` de la alerta.",
+            "url": "{{base_url}}/patient-alerts/:id/deactivate"
+          }
+        },
+        {
+          "name": "Alert Delete",
+          "request": {
+            "method": "DELETE",
+            "description": "Elimina alerta permanentemente. Requiere `id` de la alerta.",
+            "url": "{{base_url}}/patient-alerts/:id"
+          }
         }
       ]
     },
     {
       "name": "Appointments",
+      "description": "Agenda de citas del veterinario autenticado.",
       "item": [
         {
           "name": "Today",
-          "request": { "method": "GET", "url": "{{base_url}}/appointments/today" }
+          "request": {
+            "method": "GET",
+            "description": "Devuelve citas del día actual (zona horaria del servidor).\n\n## Respuesta\n```json\n{\n  \"data\": [\n    {\n      \"id\": \"uuid\",\n      \"patient_id\": \"uuid\",\n      \"scheduled_at\": \"ISO8601\",\n      \"reason\": \"...\",\n      \"status\": \"scheduled\",\n      \"urgent\": false,\n      \"consultation_id\": null,\n      \"patient\": { /* joined */ }\n    }\n  ]\n}\n```",
+            "url": "{{base_url}}/appointments/today"
+          }
         },
         {
           "name": "Create",
@@ -200,6 +262,7 @@
           ],
           "request": {
             "method": "POST",
+            "description": "Crea cita para un paciente. Guarda `appointment_id`.\n\n## Body JSON\n| Campo | Tipo | Requerido | Valores |\n|---|---|---|---|\n| `patient_id` | uuid | sí | |\n| `scheduled_at` | string | sí | ISO8601 datetime |\n| `reason` | string | no | motivo |\n| `status` | enum | no | `scheduled` \\| `now` \\| `completed` \\| `cancelled` (default `scheduled`) |\n| `urgent` | boolean | no | default `false` |",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
@@ -212,6 +275,7 @@
           "name": "Update",
           "request": {
             "method": "PATCH",
+            "description": "Actualiza cita. Al menos un campo requerido.\n\n## Body JSON (todos opcionales)\n| Campo | Valores |\n|---|---|\n| `scheduled_at` | ISO8601 |\n| `reason` | string |\n| `status` | `scheduled` \\| `now` \\| `completed` \\| `cancelled` |\n| `urgent` | boolean |\n| `consultation_id` | uuid \\| null — enlaza cita con consulta iniciada |",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}" },
             "url": "{{base_url}}/appointments/{{appointment_id}}"
@@ -219,15 +283,20 @@
         },
         {
           "name": "Delete",
-          "request": { "method": "DELETE", "url": "{{base_url}}/appointments/{{appointment_id}}" }
+          "request": {
+            "method": "DELETE",
+            "description": "Elimina cita permanentemente.",
+            "url": "{{base_url}}/appointments/{{appointment_id}}"
+          }
         }
       ]
     },
     {
       "name": "Consultation — Process Sections",
+      "description": "Endpoint único `POST /consultation/process` procesa las 9 secciones clínicas.\n\n## Cómo usar\n- Enviar `audio` (archivo mp3/wav/m4a, máx 20MB) **o** `text_input` (string). Al menos uno requerido.\n- `section`: clave de sección (anamnesis, examen_fisico, problemas, abordaje_diagnostico, examenes_complementarios, diagnostico_presuntivo, diagnostico_definitivo, plan_terapeutico, pronostico_evolucion).\n- Primera llamada: enviar `patient_id` (+ opcional `consultation_type`, `chief_complaint`) → crea consulta y devuelve `consultation_id`.\n- Siguientes llamadas: enviar `consultation_id` (se setea automático en collection var tras primera llamada).\n- Opcional `overwrite_text=true`: reemplaza texto editado por vet con nueva sugerencia IA.\n\n## Pipeline interno\n1. Sube audio a Supabase Storage (bucket `consultations-audio`). Si solo `text_input`, skip.\n2. Transcribe audio con OpenAI `gpt-4o-transcribe` (si aplica).\n3. LLM `gpt-4o-mini` procesa texto con prompt específico por sección → JSON estructurado.\n4. `flattenAiToText` convierte JSON a texto plano para UI.\n5. Upsert en tabla `sections` con `transcription`, `ai_suggested` (JSONB), `text`, `audio_url`.\n6. Devuelve estado completo + consulta actualizada.\n\n## Respuesta (todas las secciones)\n```json\n{\n  \"data\": {\n    \"consultation_id\": \"uuid\",\n    \"section\": \"anamnesis\",\n    \"audio_path\": \"https://.../consultations-audio/...\" ,\n    \"transcription\": \"texto transcrito del audio\",\n    \"ai_suggested\": { /* JSON estructurado según sección */ },\n    \"suggested_text\": \"texto plano renderizable en UI\",\n    \"section_row\": { /* fila tabla sections */ },\n    \"consultation\": { /* consulta completa con todas secciones */ }\n  },\n  \"meta\": { \"request_id\": \"...\" },\n  \"error\": null\n}\n```",
       "item": [
         {
-          "name": "1. Anamnesis (audio, crea consulta)",
+          "name": "1. Anamnesis (crea consulta)",
           "event": [
             {
               "listen": "test",
@@ -242,13 +311,15 @@
           ],
           "request": {
             "method": "POST",
+            "description": "Procesa anamnesis. **Crea la consulta** (requiere `patient_id`). Guarda `consultation_id` en collection var.\n\n## Qué decir en el audio / text_input\nHistoria clínica del paciente: enfermedades previas, si está esterilizado, si convive con otros animales, número de partos, cirugías previas, vacunación, tratamientos recientes, viajes recientes, comportamiento, motivo de consulta, desparasitación.\n\n## Inputs requeridos\n- `section=anamnesis`\n- `patient_id` (UUID del paciente)\n- `audio` (file) **o** `text_input` (string)\n\n## Inputs opcionales\n- `consultation_type`: `routine` | `surgery` | `emergency`\n- `chief_complaint`: motivo principal (string corto)\n\n## `ai_suggested` esperado\n```json\n{\n  \"enfermedades_previas\": \"\",\n  \"esterilizado\": \"\",\n  \"convive_con_otros_animales\": \"\",\n  \"numero_partos\": \"\",\n  \"cirugias_previas\": \"\",\n  \"vacunacion\": \"\",\n  \"tratamientos_recientes\": \"\",\n  \"viajes_recientes\": \"\",\n  \"comportamiento\": \"\",\n  \"motivo_consulta\": \"\",\n  \"desparasitacion\": \"\"\n}\n```\nSi la IA no detecta un dato, el valor será `\"No especificado\"`.",
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "audio", "type": "file", "src": [] },
+                { "key": "audio", "type": "file", "src": [], "description": "Archivo audio mp3/wav/m4a. Máx 20MB. Alternativa a text_input." },
+                { "key": "text_input", "value": "Perro macho castrado de 5 años, vacunas al día, desparasitación hace 2 meses. Sin cirugías previas. Convive con un gato. Motivo: vómito agudo desde ayer.", "type": "text", "description": "Texto plano. Alternativa a audio.", "disabled": true },
                 { "key": "section", "value": "anamnesis", "type": "text" },
                 { "key": "patient_id", "value": "{{patient_id}}", "type": "text" },
-                { "key": "consultation_type", "value": "routine", "type": "text" },
+                { "key": "consultation_type", "value": "routine", "type": "text", "description": "routine | surgery | emergency" },
                 { "key": "chief_complaint", "value": "Vómito agudo", "type": "text" }
               ]
             },
@@ -256,15 +327,17 @@
           }
         },
         {
-          "name": "2. Examen Físico (texto)",
+          "name": "2. Examen Físico",
           "request": {
             "method": "POST",
+            "description": "Procesa examen físico. Requiere `consultation_id` existente.\n\n## Qué decir en audio / text_input\nObservaciones del examen clínico por sistemas: mucosas, órganos de los sentidos, piel y pelaje, ganglios linfáticos, sistema digestivo, respiratorio, endocrino, músculo-esquelético, nervioso, urinario, reproductivo, palpación rectal, y otros hallazgos.\n\n## Inputs\n- `section=examen_fisico`\n- `consultation_id` (UUID)\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"mucosas\": \"\",\n  \"organos_sentidos\": \"\",\n  \"piel_pelaje\": \"\",\n  \"ganglios_linfaticos\": \"\",\n  \"sistema_digestivo\": \"\",\n  \"sistema_respiratorio\": \"\",\n  \"sistema_endocrino\": \"\",\n  \"sistema_musculo_esqueletico\": \"\",\n  \"sistema_nervioso\": \"\",\n  \"sistema_urinario\": \"\",\n  \"sistema_reproductivo\": \"\",\n  \"palpacion_rectal\": \"\",\n  \"otros\": \"\"\n}\n```",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio del examen físico." },
+                { "key": "text_input", "value": "Mucosas rosadas, frecuencia cardiaca 120, peso 18.5 kg, abdomen blando no doloroso. Piel sin lesiones. Ganglios normales.", "type": "text", "description": "Alternativa a audio." },
                 { "key": "section", "value": "examen_fisico", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Mucosas rosadas, frecuencia cardiaca 120, peso 18.5 kg, abdomen blando.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -274,12 +347,14 @@
           "name": "3. Problemas",
           "request": {
             "method": "POST",
+            "description": "Genera lista de problemas clínicos. Separa signos objetivos vs síntomas reportados.\n\n## Qué decir en audio / text_input\nProblemas identificados, signos clínicos observados, síntomas que reporta el dueño, observaciones generales.\n\n## Inputs\n- `section=problemas`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"problemas_principales\": [],\n  \"signos_clinicos\": [],\n  \"sintomas_reportados\": [],\n  \"observaciones\": \"\"\n}\n```\nArrays de strings cortos, un problema por elemento.",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con lista de problemas." },
+                { "key": "text_input", "value": "Vómito agudo de 12 horas. Sin diarrea. Apetito disminuido. Dueño reporta letargia.", "type": "text" },
                 { "key": "section", "value": "problemas", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Vómito agudo de 12 horas. Sin diarrea. Apetito disminuido.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -289,12 +364,14 @@
           "name": "4. Abordaje Diagnóstico",
           "request": {
             "method": "POST",
+            "description": "Organiza problemas, diagnósticos diferenciales y lista maestra priorizada.\n\n## Qué decir en audio / text_input\nProblemas detectados, diagnósticos diferenciales a considerar, qué problemas priorizar.\n\n## Inputs\n- `section=abordaje_diagnostico`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"problemas\": [\"...\"],\n  \"diagnosticos_diferenciales\": [\"...\"],\n  \"lista_maestra\": [\"...\"]\n}\n```",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con abordaje." },
+                { "key": "text_input", "value": "Sospecha de gastroenteritis. Descartar cuerpo extraño, parvovirosis y pancreatitis. Solicitar hemograma y ecografía abdominal.", "type": "text" },
                 { "key": "section", "value": "abordaje_diagnostico", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Sospecha de gastroenteritis. Solicitar hemograma y ecografía abdominal.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -304,12 +381,14 @@
           "name": "5. Exámenes Complementarios",
           "request": {
             "method": "POST",
+            "description": "Estructura laboratorio, imagen y otros exámenes (solicitados y resultados).\n\n## Qué decir en audio / text_input\nExámenes de laboratorio solicitados, resultados de laboratorio, imágenes solicitadas (rx, eco, TC), hallazgos de imagen, otros exámenes (citología, cultivo), interpretación general.\n\n## Inputs\n- `section=examenes_complementarios`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"laboratorio_solicitado\": [],\n  \"laboratorio_resultados\": \"\",\n  \"imagen_solicitada\": [],\n  \"imagen_resultados\": \"\",\n  \"otros_examenes\": \"\",\n  \"interpretacion_general\": \"\"\n}\n```",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con resultados de exámenes." },
+                { "key": "text_input", "value": "Hemograma normal, perfil bioquímico sin alteraciones. Ecografía abdominal muestra leve gas en asas intestinales sin obstrucción.", "type": "text" },
                 { "key": "section", "value": "examenes_complementarios", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Hemograma normal. Eco abdominal muestra leve gas en asas intestinales.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -319,12 +398,14 @@
           "name": "6. Diagnóstico Presuntivo",
           "request": {
             "method": "POST",
+            "description": "Extrae diagnóstico presuntivo con justificación clínica.\n\n## Qué decir en audio / text_input\nDiagnóstico presumido y razonamiento clínico que lo sustenta.\n\n## Inputs\n- `section=diagnostico_presuntivo`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"diagnostico_presuntivo\": \"\",\n  \"justificacion\": \"\"\n}\n```",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con diagnóstico presuntivo." },
+                { "key": "text_input", "value": "Gastroenteritis inespecífica por cuadro agudo sin fiebre, hemograma normal y eco sin obstrucción.", "type": "text" },
                 { "key": "section", "value": "diagnostico_presuntivo", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Gastroenteritis inespecífica.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -334,12 +415,14 @@
           "name": "7. Diagnóstico Definitivo",
           "request": {
             "method": "POST",
+            "description": "Extrae diagnóstico definitivo con hallazgos confirmatorios.\n\n## Qué decir en audio / text_input\nDiagnóstico final + resultados o hallazgos que lo confirman.\n\n## Inputs\n- `section=diagnostico_definitivo`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"diagnostico_definitivo\": \"\",\n  \"hallazgos_confirmatorios\": \"\"\n}\n```",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con diagnóstico definitivo." },
+                { "key": "text_input", "value": "Gastritis aguda confirmada por respuesta favorable a tratamiento sintomático y resolución en 48 horas.", "type": "text" },
                 { "key": "section", "value": "diagnostico_definitivo", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Gastritis aguda confirmada por respuesta a tratamiento sintomático.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -349,12 +432,14 @@
           "name": "8. Plan Terapéutico",
           "request": {
             "method": "POST",
+            "description": "Lista acciones del plan de tratamiento.\n\n## Qué decir en audio / text_input\nMedicamentos (nombre, dosis, vía, frecuencia), duración, cuidados, dieta, controles.\n\n## Inputs\n- `section=plan_terapeutico`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"plan_tratamiento\": [\"Acción 1\", \"Acción 2\"]\n}\n```\nArray de strings, una acción clara por elemento.",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con plan terapéutico." },
+                { "key": "text_input", "value": "Ayuno 12h, maropitant 1mg/kg SC cada 24h por 3 días, sueroterapia de mantenimiento, dieta blanda 5 días, control en 48h.", "type": "text" },
                 { "key": "section", "value": "plan_terapeutico", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Ayuno 12h, maropitant 1mg/kg SC, sueroterapia de mantenimiento, dieta blanda 5 días.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -364,12 +449,14 @@
           "name": "9. Pronóstico y Evolución",
           "request": {
             "method": "POST",
+            "description": "Resume pronóstico y evolución clínica.\n\n## Qué decir en audio / text_input\nPronóstico (favorable, reservado, desfavorable) y evolución esperada o descrita.\n\n## Inputs\n- `section=pronostico_evolucion`\n- `consultation_id`\n- `audio` **o** `text_input`\n\n## `ai_suggested` esperado\n```json\n{\n  \"pronostico\": \"\",\n  \"evolucion\": \"\"\n}\n```",
             "body": {
               "mode": "formdata",
               "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio con pronóstico y evolución." },
+                { "key": "text_input", "value": "Pronóstico favorable. Paciente respondió bien al tratamiento. Control en 48 horas para verificar resolución completa.", "type": "text" },
                 { "key": "section", "value": "pronostico_evolucion", "type": "text" },
-                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" },
-                { "key": "text_input", "value": "Pronóstico favorable. Control en 48 horas.", "type": "text" }
+                { "key": "consultation_id", "value": "{{consultation_id}}", "type": "text" }
               ]
             },
             "url": "{{base_url}}/consultation/process"
@@ -379,15 +466,21 @@
     },
     {
       "name": "Consultation — Management",
+      "description": "Operaciones sobre una consulta ya creada: lectura, edición manual de textos, pausa/reanudación y firma final.",
       "item": [
         {
           "name": "Get",
-          "request": { "method": "GET", "url": "{{base_url}}/consultation/{{consultation_id}}" }
+          "request": {
+            "method": "GET",
+            "description": "Devuelve consulta completa con todas sus secciones.\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"id\": \"uuid\",\n    \"patient_id\": \"uuid\",\n    \"veterinarian_id\": \"uuid\",\n    \"type\": \"routine\",\n    \"chief_complaint\": \"...\",\n    \"status\": \"in_progress\",\n    \"result\": null,\n    \"summary\": null,\n    \"primary_diagnosis\": null,\n    \"paused_reason\": null,\n    \"paused_note\": null,\n    \"signed_at\": null,\n    \"sections\": [ /* filas tabla sections */ ],\n    \"patient\": { /* joined */ },\n    \"created_at\": \"ISO8601\"\n  }\n}\n```",
+            "url": "{{base_url}}/consultation/{{consultation_id}}"
+          }
         },
         {
           "name": "Edit Section Text",
           "request": {
             "method": "PATCH",
+            "description": "Edita manualmente el texto o contenido JSON de una sección (tras revisión del veterinario).\n\n## Path params\n- `:id` — consultation_id\n- `:section` — una de las 9 secciones válidas\n\n## Body JSON (uno de los dos requerido)\n| Campo | Tipo | Notas |\n|---|---|---|\n| `text` | string | texto plano editado por el vet |\n| `content` | object | JSON estructurado personalizado |",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"text\": \"Texto editado manualmente por el veterinario.\"\n}" },
             "url": "{{base_url}}/consultation/{{consultation_id}}/sections/anamnesis"
@@ -397,6 +490,7 @@
           "name": "Pause",
           "request": {
             "method": "PATCH",
+            "description": "Pausa una consulta en curso (ej: esperando resultados).\n\n## Body JSON\n| Campo | Tipo | Requerido | Valores |\n|---|---|---|---|\n| `reason` | enum | sí | `labs` \\| `imaging` \\| `procedure` \\| `owner` \\| `other` |\n| `note` | string | no | nota libre |",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"reason\": \"labs\",\n  \"note\": \"Esperando resultados de laboratorio\"\n}" },
             "url": "{{base_url}}/consultation/{{consultation_id}}/pause"
@@ -404,12 +498,17 @@
         },
         {
           "name": "Resume",
-          "request": { "method": "PATCH", "url": "{{base_url}}/consultation/{{consultation_id}}/resume" }
+          "request": {
+            "method": "PATCH",
+            "description": "Reanuda una consulta pausada. Sin body.",
+            "url": "{{base_url}}/consultation/{{consultation_id}}/resume"
+          }
         },
         {
           "name": "Sign",
           "request": {
             "method": "PATCH",
+            "description": "Firma y cierra consulta. Reemplaza al antiguo `/close` (alias vigente por compatibilidad).\n\n## Body JSON\n| Campo | Tipo | Requerido | Valores |\n|---|---|---|---|\n| `result` | enum | sí | `discharge` \\| `hospitalization` \\| `deceased` \\| `referred` |\n| `summary` | string | no | resumen libre |\n| `primary_diagnosis` | string | no | diagnóstico principal |\n\nTras firmar la consulta queda inmutable (status `signed`).",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
@@ -422,6 +521,7 @@
     },
     {
       "name": "Consultation — Attachments",
+      "description": "Archivos adjuntos (PDFs de laboratorio, imágenes, etc.) asociados a una consulta y opcionalmente a una sección específica.",
       "item": [
         {
           "name": "Upload",
@@ -439,11 +539,12 @@
           ],
           "request": {
             "method": "POST",
+            "description": "Sube adjunto a la consulta. Guarda `attachment_id` en collection var.\n\n## Form-data\n| Campo | Tipo | Requerido | Notas |\n|---|---|---|---|\n| `file` | file | sí | cualquier archivo (pdf, img). Sube a Supabase Storage |\n| `section` | text (enum) | no | misma lista que process sections. Asocia adjunto a sección clínica |\n| `label` | text | no | descripción corta |",
             "body": {
               "mode": "formdata",
               "formdata": [
                 { "key": "file", "type": "file", "src": [] },
-                { "key": "section", "value": "examenes_complementarios", "type": "text" },
+                { "key": "section", "value": "examenes_complementarios", "type": "text", "description": "anamnesis | examen_fisico | problemas | abordaje_diagnostico | examenes_complementarios | diagnostico_presuntivo | diagnostico_definitivo | plan_terapeutico | pronostico_evolucion" },
                 { "key": "label", "value": "Hemograma PDF", "type": "text" }
               ]
             },
@@ -452,12 +553,17 @@
         },
         {
           "name": "List",
-          "request": { "method": "GET", "url": "{{base_url}}/consultation/{{consultation_id}}/attachments" }
+          "request": {
+            "method": "GET",
+            "description": "Lista todos los adjuntos de la consulta.",
+            "url": "{{base_url}}/consultation/{{consultation_id}}/attachments"
+          }
         },
         {
           "name": "Delete",
           "request": {
             "method": "DELETE",
+            "description": "Elimina adjunto por ID (remueve de Storage + DB).",
             "url": "{{base_url}}/consultation/{{consultation_id}}/attachments/{{attachment_id}}"
           }
         }
@@ -465,16 +571,18 @@
     },
     {
       "name": "Dashboard",
+      "description": "Endpoints de listado para pantalla de inicio del vet: consultas recientes firmadas + consultas por estado.",
       "item": [
         {
           "name": "Consultations Recent",
           "request": {
             "method": "GET",
+            "description": "Lista consultas firmadas recientes del veterinario autenticado.\n\n## Query params\n| Param | Tipo | Default | Notas |\n|---|---|---|---|\n| `limit` | number | 4 | máx 20 |\n\n## Respuesta\n```json\n{\n  \"data\": [ { /* consulta con patient joined */ } ],\n  \"meta\": { \"count\": 4 }\n}\n```",
             "url": {
               "raw": "{{base_url}}/consultations/recent?limit=4",
               "host": ["{{base_url}}"],
               "path": ["consultations", "recent"],
-              "query": [{ "key": "limit", "value": "4" }]
+              "query": [{ "key": "limit", "value": "4", "description": "máx 20" }]
             }
           }
         },
@@ -482,11 +590,12 @@
           "name": "Consultations by Status",
           "request": {
             "method": "GET",
+            "description": "Filtra consultas del veterinario autenticado por estado.\n\n## Query params\n| Param | Tipo | Requerido | Valores |\n|---|---|---|---|\n| `status` | enum | sí | `in_progress` \\| `paused` \\| `signed` |\n\nSi `status` inválido o ausente → 400.",
             "url": {
               "raw": "{{base_url}}/consultations?status=paused",
               "host": ["{{base_url}}"],
               "path": ["consultations"],
-              "query": [{ "key": "status", "value": "paused" }]
+              "query": [{ "key": "status", "value": "paused", "description": "in_progress | paused | signed" }]
             }
           }
         }
