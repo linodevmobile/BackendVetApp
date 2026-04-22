@@ -1,24 +1,33 @@
-const { getVeterinarian, listVeterinarians } = require('../services/stateService');
-const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
 
-async function getById(req, res) {
+async function me(req, res, next) {
   try {
-    const vet = await getVeterinarian(req.params.id);
-    res.json(vet);
-  } catch (error) {
-    logger.error('Error al obtener veterinario:', error.message);
-    res.status(404).json({ error: 'Veterinario no encontrado', details: error.message });
+    const { data, error } = await req.supabase
+      .from('veterinarians')
+      .select('id, full_name, email, license_number, phone, salutation')
+      .eq('id', req.veterinarianId)
+      .single();
+    if (error) throw error;
+    return res.ok(data);
+  } catch (err) {
+    next(err);
   }
 }
 
-async function list(req, res) {
+async function getById(req, res, next) {
   try {
-    const vets = await listVeterinarians();
-    res.json(vets);
-  } catch (error) {
-    logger.error('Error al listar veterinarios:', error.message);
-    res.status(500).json({ error: 'Error al listar veterinarios', details: error.message });
+    const { data, error } = await req.supabase
+      .from('veterinarians')
+      .select('id, full_name, email, license_number, phone, salutation')
+      .eq('id', req.params.id)
+      .single();
+    if (error) throw error;
+    if (!data) throw AppError.notFound('Veterinario no encontrado');
+    return res.ok(data);
+  } catch (err) {
+    if (err.code === 'PGRST116') return next(AppError.notFound('Veterinario no encontrado'));
+    next(err);
   }
 }
 
-module.exports = { getById, list };
+module.exports = { me, getById };

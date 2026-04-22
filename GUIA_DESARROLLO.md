@@ -1,384 +1,179 @@
-# Guía de Desarrollo - BackendVetApp
+# Guía de Desarrollo — BackendVetApp
 
-## 1. Servidor Local
+Backend v2 (reestructurado). Arquitectura en capas: `middlewares → routes → controllers → repositories → services`.
 
-### Iniciar el servidor
+---
+
+## 1. Servidor local
+
 ```bash
-npm run dev
+npm run dev     # con --watch, reinicia al guardar
+npm start       # modo producción
 ```
-Esto arranca el servidor en `http://localhost:3000` con auto-reload (si cambias un archivo, se reinicia solo).
 
-### Detener el servidor
-Presiona `Ctrl + C` en la terminal donde está corriendo.
+URL: `http://localhost:3000`. Detener con `Ctrl+C`.
 
-### Iniciar en modo producción (sin auto-reload)
+Primer setup en máquina nueva:
 ```bash
-npm start
+npm install
+cp .env.example .env   # rellenar keys
 ```
 
 ---
 
 ## 2. Probar cambios
 
-### Desde Postman
-1. Cambia el environment a `base_url = http://localhost:3000`
-2. Selecciona el request que quieras probar
-3. Adjunta un audio y dale Send
+Todos los endpoints (excepto `/auth/*`) exigen `Authorization: Bearer <access_token>`. Obtener token con `POST /auth/login`.
 
-### Desde terminal (curl)
+### Postman
+1. Collection actualizada: `BackendVetApp.postman_collection.json`.
+2. Environment `base_url=http://localhost:3000`. Scripts de test guardan `access_token` automáticamente en login.
+3. Requests protegidos usan `{{access_token}}` en el header.
+
+### curl
 ```bash
-curl -X POST http://localhost:3000/consultation/process -F "audio=@ruta/al/audio.mp3" -F "section=anamnesis"
+# Login
+curl -X POST http://localhost:3000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"vet@example.com","password":"secret123"}'
+
+# Procesar sección con audio
+curl -X POST http://localhost:3000/consultation/process \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "audio=@mi-audio.mp3" \
+  -F "section=anamnesis" \
+  -F "patient_id=<uuid>"
+
+# Procesar sección con texto
+curl -X POST http://localhost:3000/consultation/process \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "section=examen_fisico" \
+  -F "consultation_id=<uuid>" \
+  -F "text_input=Mucosas rosadas, FC 120, peso 8.2 kg."
 ```
 
 ---
 
-## 3. Ajustar un Prompt
+## 3. Ajustar un prompt
 
-Los prompts están en `src/prompts/`. Cada archivo exporta un string.
+1. Editar el archivo correspondiente en `src/prompts/` (ej: `treatment-planPrompt.js`).
+2. Guardar — `npm run dev` auto-reinicia.
+3. Probar vía Postman/curl.
 
-1. Abre el archivo del prompt que quieras modificar (ej: `src/prompts/treatment-planPrompt.js`)
-2. Edita el texto del prompt
-3. Guarda el archivo
-4. Si usas `npm run dev`, el servidor se reinicia solo
-5. Prueba con un audio en Postman o curl
-
-**No necesitas tocar nada más.** Solo el archivo del prompt.
+Los 9 prompts viven en español; claves JSON flat para mantener rendering simple en UI. No anidar más de un nivel.
 
 ---
 
-## 4. Agregar una Nueva Sección Clínica
+## 4. Agregar una sección clínica nueva
 
-Ejemplo: agregar una sección `examen_complementario`.
+**Requiere 3 cambios** (el 4to, la DB, ya está cubierto si se agregó al enum antes):
 
-### Paso 1 — Crear el prompt
-Crea el archivo `src/prompts/complementary-examPrompt.js`:
-```js
-const COMPLEMENTARY_EXAM_PROMPT = `Tu prompt aquí...
+1. Crear `src/prompts/miNuevaSeccionPrompt.js`.
+2. Registrar en `src/services/promptRouter.js` con la clave exacta del enum.
+3. Agregar el valor al enum `clinical_section` en `supabase_schema_v2.sql` (si aún no está) y aplicar:
+   ```sql
+   ALTER TYPE clinical_section ADD VALUE 'mi_nueva_seccion';
+   ```
 
-Devuelve SOLO JSON válido, sin markdown, sin backticks, sin texto adicional:
-
-{
-  "examenes": []
-}`;
-
-module.exports = COMPLEMENTARY_EXAM_PROMPT;
-```
-
-### Paso 2 — Registrar en el promptRouter
-Abre `src/services/promptRouter.js` y agrega:
-```js
-// Arriba, agregar el require:
-const COMPLEMENTARY_EXAM_PROMPT = require('../prompts/complementary-examPrompt');
-
-// Dentro del objeto PROMPTS, agregar:
-examen_complementario: COMPLEMENTARY_EXAM_PROMPT,
-```
-
-### Paso 3 — Agregar columna en Supabase
-Ve al SQL Editor de Supabase y ejecuta:
-```sql
-ALTER TABLE consultations ADD COLUMN IF NOT EXISTS examen_complementario JSONB;
-```
-
-### Paso 4 — Probar
-```bash
-curl -X POST http://localhost:3000/consultation/process -F "audio=@audio.mp3" -F "section=examen_complementario"
-```
-
-**Eso es todo.** No necesitas tocar controller, routes ni services.
+La tabla `consultation_sections` ya guarda cualquier sección válida sin cambios adicionales.
 
 ---
 
-## 5. Agregar una Nueva Tabla y Asociarla
+## 5. Agregar un recurso/endpoint nuevo
 
-Ejemplo: crear tabla `patients` y asociar cada consulta a un paciente.
+Patrón por capa:
 
-### Paso 1 — Crear la tabla en Supabase
-Ve al SQL Editor de Supabase y ejecuta:
-```sql
--- Crear tabla de pacientes
-CREATE TABLE patients (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  name TEXT NOT NULL,
-  species TEXT,
-  breed TEXT,
-  age TEXT,
-  weight TEXT,
-  sex TEXT,
-  owner_name TEXT,
-  owner_phone TEXT
-);
+1. **SQL** — tabla + RLS en `supabase_schema_v2.sql`.
+2. **Repository** — `src/repositories/xRepo.js` (funciones puras que reciben `supabase` como primer arg).
+3. **Validator** — `src/validators/xSchema.js` con zod.
+4. **Controller** — `src/controllers/xController.js` con `res.ok(...)` / `next(err)`.
+5. **Routes** — `src/routes/xRoutes.js` con `validate({ body, query, params })`.
+6. **app.js** — `app.use('/x', authMiddleware, xRoutes)`.
 
--- Agregar columna de relación en consultations
-ALTER TABLE consultations ADD COLUMN IF NOT EXISTS patient_id UUID REFERENCES patients(id);
-
--- Permisos de acceso
-CREATE POLICY "Allow all on patients" ON patients FOR ALL TO anon USING (true) WITH CHECK (true);
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
-```
-
-### Paso 2 — Crear el servicio
-Crea `src/services/patientService.js`:
-```js
-const supabase = require('../config/supabaseClient');
-const logger = require('../utils/logger');
-
-async function createPatient(patientData) {
-  const { data, error } = await supabase
-    .from('patients')
-    .insert(patientData)
-    .select()
-    .single();
-
-  if (error) {
-    logger.error('Error al crear paciente:', error.message);
-    throw new Error(error.message);
-  }
-  return data;
-}
-
-async function getPatient(id) {
-  const { data, error } = await supabase
-    .from('patients')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    logger.error('Error al obtener paciente:', error.message);
-    throw new Error(error.message);
-  }
-  return data;
-}
-
-async function listPatients() {
-  const { data, error } = await supabase
-    .from('patients')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    logger.error('Error al listar pacientes:', error.message);
-    throw new Error(error.message);
-  }
-  return data;
-}
-
-module.exports = { createPatient, getPatient, listPatients };
-```
-
-### Paso 3 — Crear el controller
-Crea `src/controllers/patientController.js`:
-```js
-const { createPatient, getPatient, listPatients } = require('../services/patientService');
-
-async function create(req, res) {
-  try {
-    const patient = await createPatient(req.body);
-    res.status(201).json(patient);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-}
-
-async function getById(req, res) {
-  try {
-    const patient = await getPatient(req.params.id);
-    res.json(patient);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-}
-
-async function list(req, res) {
-  try {
-    const patients = await listPatients();
-    res.json(patients);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-}
-
-module.exports = { create, getById, list };
-```
-
-### Paso 4 — Crear las rutas
-Crea `src/routes/patientRoutes.js`:
-```js
-const express = require('express');
-const router = express.Router();
-const { create, getById, list } = require('../controllers/patientController');
-
-router.post('/', create);
-router.get('/', list);
-router.get('/:id', getById);
-
-module.exports = router;
-```
-
-### Paso 5 — Registrar las rutas en app.js
-Abre `src/app.js` y agrega:
-```js
-const patientRoutes = require('./routes/patientRoutes');
-app.use('/patients', patientRoutes);
-```
-
-### Paso 6 — Asociar consulta a paciente
-Ahora al crear una consulta puedes enviar `patient_id` en el body para asociarla.
-
-### Resumen del patrón
-Para cualquier tabla nueva siempre es:
-1. **SQL** en Supabase (tabla + permisos)
-2. **Service** (`src/services/`) — lógica de base de datos
-3. **Controller** (`src/controllers/`) — recibe request, llama al service, responde
-4. **Routes** (`src/routes/`) — define los endpoints (GET, POST, PUT, DELETE)
-5. **app.js** — registrar la nueva ruta
+Todo controller usa `req.supabase` (cliente scope-del-token) y `req.veterinarianId`.
 
 ---
 
-## 6. Instalar una nueva dependencia (paquete npm)
+## 6. Tabla híbrida `consultation_sections`
+
+Nunca mutar `ai_suggested` en edits manuales. `PATCH /consultation/:id/sections/:section` solo toca `text` y/o `content`. Si se reprocesa audio/texto, `overwrite_text=false` (default) preserva la edición del vet.
+
+---
+
+## 7. Errores
+
+Usar `AppError.validation()`, `.unauthorized()`, `.forbidden()`, `.notFound()`, `.conflict()`, `.internal()`. El `errorHandler` los convierte en el wrapper `{ error: { code, message, details } }`.
+
+---
+
+## 8. Logs
+
+`src/utils/logger.js` imprime con timestamp. Cada request tiene un `x-request-id` inyectado por `middlewares/requestId.js`, devuelto en el header de la respuesta — útil para correlacionar logs de cliente vs servidor.
+
+---
+
+## 9. Rate limits
+
+- `/auth/*` — 20 req / 15 min por IP.
+- `/consultation/process` — 30 req / min por IP.
+
+Configurable en `src/middlewares/rateLimiters.js`.
+
+---
+
+## 10. Variables de entorno
+
+| Variable | Uso |
+|---|---|
+| `OPENAI_API_KEY` | Transcripción + LLM |
+| `SUPABASE_URL` | URL del proyecto |
+| `SUPABASE_ANON_KEY` | Cliente público + validación JWT |
+| `SUPABASE_SERVICE_ROLE_KEY` | Admin ops (rollback register) |
+| `PORT` | Puerto HTTP, default 3000 |
+
+Producción: Render dashboard → Environment. Nunca commit `.env`.
+
+---
+
+## 11. Git
+
+- Rama principal: `main` (antes `master`). Otras ramas son seguras para experimentar.
+- Render despliega la rama configurada automáticamente al push.
 
 ```bash
-npm install nombre-del-paquete
-```
-
-Esto actualiza `package.json` y `package-lock.json` automáticamente.
-
----
-
-## 7. Limpiar cache y reinstalar
-
-Si algo no funciona o quieres empezar limpio:
-
-```bash
-# Borrar node_modules y cache
-rm -rf node_modules
-npm cache clean --force
-
-# Reinstalar todo
-npm install
+git checkout -b feature/x
+# cambios + commit
+git push origin feature/x
+# merge via PR cuando esté listo
 ```
 
 ---
 
-## 8. Ramas de Git (importante)
-
-Actualmente solo existe la rama `master`, que es la que Render despliega automáticamente. Esto significa que **cualquier push a master se despliega a producción de inmediato**.
-
-### Si quieres probar algo sin afectar producción
-
-Crea una rama nueva:
-```bash
-# Crear rama y cambiarte a ella
-git checkout -b mi-experimento
-
-# Haz tus cambios, prueba en local...
-
-# Commit normal
-git add .
-git commit -m "Probando cambio X"
-
-# Push a GitHub (NO se despliega porque Render solo escucha master)
-git push https://linodevmobile@github.com/linodevmobile/BackendVetApp.git mi-experimento
-```
-
-### Cuando el cambio esté listo para producción
-```bash
-# Vuelve a master
-git checkout master
-
-# Trae los cambios de tu rama
-git merge mi-experimento
-
-# Push a master = se despliega automáticamente
-git push https://linodevmobile@github.com/linodevmobile/BackendVetApp.git master
-```
-
-### Regla de oro
-- **`master`** = producción. Solo sube aquí lo que ya probaste y funciona.
-- **Otras ramas** = experimentos, pruebas, features en desarrollo. Puedes romper cosas sin miedo.
-
----
-
-## 9. Subir cambios a GitHub
-
-Después de hacer cambios y probarlos localmente:
-
-```bash
-# Ver qué archivos cambiaste
-git status
-
-# Agregar los archivos modificados
-git add src/prompts/archivo-que-cambiaste.js
-
-# Crear el commit con un mensaje descriptivo
-git commit -m "Descripción de lo que hiciste"
-
-# Subir a GitHub (usar tu cuenta personal)
-# A master (se despliega automáticamente):
-git push https://linodevmobile@github.com/linodevmobile/BackendVetApp.git master
-
-# A otra rama (NO se despliega):
-git push https://linodevmobile@github.com/linodevmobile/BackendVetApp.git nombre-de-rama
-```
-
----
-
-## 10. Desplegar a Producción (Render)
-
-### Despliegue automático
-Render está conectado a tu rama `master`. Cada vez que haces `git push` a **master**, Render detecta el cambio y **despliega automáticamente**. Push a otras ramas NO despliega.
-
-### Despliegue manual (si el automático falla)
-1. Ve a render.com > tu servicio BackendVetApp
-2. Clic en "Manual Deploy" > "Deploy latest commit"
-
-### Verificar que está funcionando
-Abre en el navegador: https://backendvetapp.onrender.com
-
----
-
-## 11. Variables de entorno
-
-### Local
-Edita el archivo `.env` en la raíz del proyecto.
-
-### Producción (Render)
-1. Ve a render.com > tu servicio > Environment
-2. Agrega o edita las variables ahí
-
-**Nunca subas el archivo `.env` a GitHub.** Ya está en `.gitignore`.
-
----
-
-## 12. Estructura rápida de referencia
+## 12. Estructura rápida
 
 ```
 src/
-├── config/          # Clientes (OpenAI, Supabase) — rara vez se tocan
-├── controllers/     # Orquestación — uno por recurso (consultation, patient, etc.)
-├── prompts/         # AQUÍ se ajustan los prompts ← lo más frecuente
-├── routes/          # Rutas Express — una por recurso
-├── services/
-│   ├── promptRouter.js    # ← registrar nuevas secciones aquí
-│   ├── llmService.js      # Configuración del modelo GPT
-│   ├── transcriptionService.js  # Configuración de transcripción
-│   ├── stateService.js    # Operaciones con tabla consultations
-│   └── storageService.js  # Subida de audios a Storage
-├── utils/           # Logger y parser JSON
-├── app.js           # Config de Express — registrar nuevas rutas aquí
-└── server.js        # Entry point
+├── config/           # supabaseClient (anon/admin/token-scoped), openaiClient
+├── middlewares/      # auth, responseWrapper, errorHandler, validate, upload, requestId, rateLimiters
+├── validators/       # authSchema, patientSchema, consultationSchema, appointmentSchema, alertSchema, attachmentSchema
+├── controllers/      # auth, veterinarian, patient, consultation, appointment, dashboard, attachment, alert
+├── repositories/     # patientsRepo, consultationsRepo, sectionsRepo, appointmentsRepo, favoritesRepo, alertsRepo, attachmentsRepo
+├── services/         # llmService, promptRouter, transcriptionService, storageService
+├── prompts/          # 9 prompts clínicos
+├── routes/           # authRoutes, patientRoutes, consultationRoutes, appointmentRoutes, dashboardRoutes, veterinarianRoutes, alertRoutes
+├── utils/            # AppError, logger, safeJsonParse, flattenAiToText, salutation
+├── app.js
+└── server.js
 ```
 
-### Resumen: qué archivo tocar según lo que quieras hacer
+### Qué archivo tocar según lo que quieras
 
-| Quiero... | Archivo(s) a modificar |
+| Tarea | Archivos |
 |---|---|
-| Ajustar un prompt | `src/prompts/[seccion]Prompt.js` |
-| Agregar nueva sección clínica | `src/prompts/` + `src/services/promptRouter.js` + SQL en Supabase |
-| Agregar nueva tabla | SQL + `src/services/` + `src/controllers/` + `src/routes/` + `src/app.js` |
-| Cambiar modelo de IA | `src/services/llmService.js` (línea del model) |
-| Cambiar modelo de transcripción | `src/services/transcriptionService.js` (línea del model) |
-| Cambiar puerto | `.env` (variable PORT) |
-| Cambiar keys | `.env` (local) o Render dashboard (producción) |
+| Ajustar prompt | `src/prompts/[seccion]Prompt.js` |
+| Agregar sección clínica | prompt + `promptRouter.js` + `ALTER TYPE` en SQL |
+| Agregar recurso nuevo | repo + validator + controller + routes + `app.js` |
+| Cambiar modelo LLM | `src/services/llmService.js` |
+| Cambiar modelo transcripción | `src/services/transcriptionService.js` |
+| Ajustar rate limit | `src/middlewares/rateLimiters.js` |
+| Cambiar RLS policy | `supabase_schema_v2.sql` + reaplicar |

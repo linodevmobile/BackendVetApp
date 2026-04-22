@@ -9,10 +9,11 @@ async function transcribeAudio(filePath) {
 
   const response = await openai.audio.transcriptions.create({
     file: fileStream,
-    model: 'gpt-4o-transcribe',
+    model: 'whisper-1',
+    language: 'es',
   });
 
-  const text = response.text.trim();
+  const text = (response.text || '').trim();
   logger.info('Transcripción completada, longitud:', text.length);
 
   return text;

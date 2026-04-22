@@ -1,35 +1,31 @@
-const supabase = require('../config/supabaseClient');
+const { supabase, supabaseAdmin, supabaseForToken } = require('../config/supabaseClient');
+const { buildSalutation } = require('../utils/salutation');
+const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 
-async function login(req, res) {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Se requieren los campos "email" y "password"' });
-  }
-
+async function login(req, res, next) {
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { email, password } = req.body;
 
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       logger.error('Error de autenticación:', error.message);
-      return res.status(401).json({ error: 'Credenciales inválidas', details: error.message });
+      throw AppError.unauthorized('Credenciales inválidas');
     }
 
-    // Get veterinarian profile
     const { data: vet, error: vetError } = await supabase
       .from('veterinarians')
-      .select('*')
+      .select('id, full_name, email, license_number, phone, salutation')
       .eq('id', data.user.id)
       .single();
 
-    if (vetError) {
-      logger.error('Veterinario no encontrado para usuario:', data.user.id);
-      return res.status(403).json({ error: 'Usuario no registrado como veterinario' });
+    if (vetError || !vet) {
+      logger.error('Perfil veterinario no encontrado:', data.user.id);
+      throw AppError.forbidden('Usuario no registrado como veterinario');
     }
 
     logger.info('Login exitoso:', email);
-    res.json({
+    return res.ok({
       session: {
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
@@ -37,21 +33,16 @@ async function login(req, res) {
       },
       veterinarian: vet,
     });
-  } catch (error) {
-    logger.error('Error en login:', error.message);
-    res.status(500).json({ error: 'Error en el servidor', details: error.message });
+  } catch (err) {
+    next(err);
   }
 }
 
-async function register(req, res) {
-  const { email, password, full_name, license_number, phone } = req.body;
-
-  if (!email || !password || !full_name) {
-    return res.status(400).json({ error: 'Se requieren los campos "email", "password" y "full_name"' });
-  }
+async function register(req, res, next) {
+  const { email, password, full_name, license_number, phone, salutation } = req.body;
+  let createdUserId = null;
 
   try {
-    // 1. Create user in Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -60,11 +51,17 @@ async function register(req, res) {
 
     if (error) {
       logger.error('Error al registrar usuario:', error.message);
-      return res.status(400).json({ error: 'Error al registrar usuario', details: error.message });
+      throw AppError.validation('Error al registrar usuario', [{ path: 'auth', message: error.message }]);
     }
 
-    // 2. Create veterinarian profile
-    const { data: vet, error: vetError } = await supabase
+    createdUserId = data.user.id;
+    const finalSalutation = buildSalutation(full_name, salutation);
+
+    const writeClient = data.session?.access_token
+      ? supabaseForToken(data.session.access_token)
+      : (supabaseAdmin || supabase);
+
+    const { data: vet, error: vetError } = await writeClient
       .from('veterinarians')
       .insert({
         id: data.user.id,
@@ -72,23 +69,32 @@ async function register(req, res) {
         email,
         license_number,
         phone,
+        salutation: finalSalutation,
       })
-      .select()
+      .select('id, full_name, email, license_number, phone, salutation')
       .single();
 
     if (vetError) {
-      logger.error('Error al crear perfil veterinario:', vetError.message);
-      return res.status(500).json({ error: 'Usuario creado pero falló el perfil veterinario', details: vetError.message });
+      logger.error('Error al crear perfil veterinario, ejecutando rollback:', vetError.message);
+      if (supabaseAdmin) {
+        await supabaseAdmin.auth.admin.deleteUser(createdUserId).catch((e) =>
+          logger.error('Rollback deleteUser falló:', e.message)
+        );
+      }
+      throw AppError.internal('No se pudo crear el perfil veterinario', vetError.message);
     }
 
     logger.info('Veterinario registrado:', email);
-    res.status(201).json({
-      user_id: data.user.id,
-      veterinarian: vet,
-    });
-  } catch (error) {
-    logger.error('Error en registro:', error.message);
-    res.status(500).json({ error: 'Error en el servidor', details: error.message });
+    return res.ok(
+      {
+        user_id: data.user.id,
+        veterinarian: vet,
+      },
+      null,
+      201
+    );
+  } catch (err) {
+    next(err);
   }
 }
 

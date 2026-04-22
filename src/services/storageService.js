@@ -4,39 +4,42 @@ const { v4: uuidv4 } = require('uuid');
 const supabase = require('../config/supabaseClient');
 const logger = require('../utils/logger');
 
-const BUCKET_NAME = 'consultations-audio';
+const AUDIO_BUCKET = 'consultations-audio';
+const ATTACHMENTS_BUCKET = 'consultation-attachments';
 
-async function uploadAudio(filePath, originalName) {
+async function uploadFile(bucket, filePath, originalName, mimeType) {
   const ext = path.extname(originalName);
   const fileName = `${uuidv4()}${ext}`;
-
-  logger.info('Subiendo audio a Supabase Storage:', fileName);
-
   const fileBuffer = fs.readFileSync(filePath);
 
   const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
+    .from(bucket)
     .upload(fileName, fileBuffer, {
-      contentType: 'audio/mpeg',
+      contentType: mimeType || 'application/octet-stream',
       upsert: false,
     });
 
   if (error) {
-    logger.error('Error al subir audio:', error.message);
-    throw new Error(`Error al subir audio a Storage: ${error.message}`);
+    logger.error(`Error al subir archivo al bucket ${bucket}:`, error.message);
+    throw new Error(`Error al subir archivo: ${error.message}`);
   }
-
-  logger.info('Audio subido exitosamente:', data.path);
   return data.path;
+}
+
+async function uploadAudio(filePath, originalName, mimeType) {
+  return uploadFile(AUDIO_BUCKET, filePath, originalName, mimeType || 'audio/mpeg');
+}
+
+async function uploadAttachment(filePath, originalName, mimeType) {
+  return uploadFile(ATTACHMENTS_BUCKET, filePath, originalName, mimeType);
 }
 
 function deleteLocalFile(filePath) {
   try {
     fs.unlinkSync(filePath);
-    logger.info('Archivo temporal eliminado:', filePath);
   } catch (err) {
     logger.warn('No se pudo eliminar archivo temporal:', err.message);
   }
 }
 
-module.exports = { uploadAudio, deleteLocalFile };
+module.exports = { uploadAudio, uploadAttachment, deleteLocalFile };

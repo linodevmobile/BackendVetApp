@@ -1,55 +1,76 @@
-const { createPatient, getPatient, listPatients, updatePatient } = require('../services/stateService');
-const logger = require('../utils/logger');
+const patientsRepo = require('../repositories/patientsRepo');
+const favoritesRepo = require('../repositories/favoritesRepo');
+const AppError = require('../utils/AppError');
 
-async function create(req, res) {
-  const { name, species, breed, sex, date_of_birth, weight_kg, microchip, owner_name, owner_phone, owner_email } = req.body;
+async function create(req, res, next) {
+  try {
+    const patient = await patientsRepo.create(req.supabase, req.veterinarianId, req.body);
+    return res.ok(patient, null, 201);
+  } catch (err) {
+    next(err);
+  }
+}
 
-  if (!name || !species || !sex || !owner_name) {
-    return res.status(400).json({
-      error: 'Campos requeridos: name, species, sex, owner_name',
+async function getById(req, res, next) {
+  try {
+    const patient = await patientsRepo.getById(req.supabase, req.veterinarianId, req.params.id);
+    if (!patient) throw AppError.notFound('Paciente no encontrado');
+    return res.ok(patient);
+  } catch (err) {
+    if (err.code === 'PGRST116') return next(AppError.notFound('Paciente no encontrado'));
+    next(err);
+  }
+}
+
+async function list(req, res, next) {
+  try {
+    const { search, filter, limit, offset } = req.query;
+    const result = await patientsRepo.list(req.supabase, req.veterinarianId, {
+      search,
+      filter: filter || 'all',
+      limit,
+      offset,
     });
-  }
-
-  try {
-    const patient = await createPatient({
-      name, species, breed, sex, date_of_birth, weight_kg, microchip,
-      owner_name, owner_phone, owner_email,
-    });
-    res.status(201).json(patient);
-  } catch (error) {
-    logger.error('Error al crear paciente:', error.message);
-    res.status(500).json({ error: 'Error al crear paciente', details: error.message });
+    return res.ok(result.items, { total: result.total, limit, offset });
+  } catch (err) {
+    next(err);
   }
 }
 
-async function getById(req, res) {
+async function update(req, res, next) {
   try {
-    const patient = await getPatient(req.params.id);
-    res.json(patient);
-  } catch (error) {
-    logger.error('Error al obtener paciente:', error.message);
-    res.status(404).json({ error: 'Paciente no encontrado', details: error.message });
+    const patient = await patientsRepo.update(req.supabase, req.veterinarianId, req.params.id, req.body);
+    return res.ok(patient);
+  } catch (err) {
+    next(err);
   }
 }
 
-async function list(req, res) {
+async function addFavorite(req, res, next) {
   try {
-    const patients = await listPatients();
-    res.json(patients);
-  } catch (error) {
-    logger.error('Error al listar pacientes:', error.message);
-    res.status(500).json({ error: 'Error al listar pacientes', details: error.message });
+    const fav = await favoritesRepo.add(req.supabase, req.veterinarianId, req.params.patient_id);
+    return res.ok(fav, null, 201);
+  } catch (err) {
+    next(err);
   }
 }
 
-async function update(req, res) {
+async function removeFavorite(req, res, next) {
   try {
-    const patient = await updatePatient(req.params.id, req.body);
-    res.json(patient);
-  } catch (error) {
-    logger.error('Error al actualizar paciente:', error.message);
-    res.status(500).json({ error: 'Error al actualizar paciente', details: error.message });
+    await favoritesRepo.remove(req.supabase, req.veterinarianId, req.params.patient_id);
+    return res.ok({ deleted: true });
+  } catch (err) {
+    next(err);
   }
 }
 
-module.exports = { create, getById, list, update };
+async function listFavorites(req, res, next) {
+  try {
+    const items = await favoritesRepo.list(req.supabase, req.veterinarianId);
+    return res.ok(items, { count: items.length });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { create, getById, list, update, addFavorite, removeFavorite, listFavorites };

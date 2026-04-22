@@ -1,114 +1,161 @@
 const { transcribeAudio } = require('../services/transcriptionService');
-const { getPrompt, isValidSection, getDbSection, VALID_SECTIONS } = require('../services/promptRouter');
+const { getPrompt, isValidSection, VALID_SECTIONS } = require('../services/promptRouter');
 const { processWithLLM } = require('../services/llmService');
-const { createConsultation, getConsultation, closeConsultation, upsertDraft } = require('../services/stateService');
 const { uploadAudio, deleteLocalFile } = require('../services/storageService');
+const { flattenAiToText } = require('../utils/flattenAiToText');
+const consultationsRepo = require('../repositories/consultationsRepo');
+const sectionsRepo = require('../repositories/sectionsRepo');
+const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 
-async function processConsultation(req, res) {
+async function processConsultation(req, res, next) {
   const file = req.file;
-  const { section, consultation_id, patient_id, veterinarian_id } = req.body;
-
-  // --- Validations ---
-  if (!file) {
-    return res.status(400).json({ error: 'Se requiere un archivo de audio' });
-  }
-
-  if (!section) {
-    return res.status(400).json({ error: 'Se requiere el campo "section"' });
-  }
-
-  if (!isValidSection(section)) {
-    return res.status(400).json({
-      error: `Sección inválida. Secciones válidas: ${VALID_SECTIONS.join(', ')}`,
-    });
-  }
-
-  if (!consultation_id && (!patient_id || !veterinarian_id)) {
-    return res.status(400).json({
-      error: 'Se requiere "consultation_id" o bien "patient_id" y "veterinarian_id" para crear una nueva consulta',
-    });
-  }
-
-  const MAX_SIZE = 20 * 1024 * 1024; // 20MB
-  if (file.size > MAX_SIZE) {
-    deleteLocalFile(file.path);
-    return res.status(400).json({ error: 'El archivo excede el tamaño máximo de 20MB' });
-  }
 
   try {
-    // 1. Upload audio to Supabase Storage
-    const audioPath = await uploadAudio(file.path, file.originalname);
+    const {
+      section,
+      consultation_id,
+      patient_id,
+      consultation_type,
+      chief_complaint,
+      text_input,
+      overwrite_text,
+    } = req.body;
 
-    // 2. Transcribe audio with OpenAI
-    const transcribedText = await transcribeAudio(file.path);
-
-    // 3. Delete local temp file
-    deleteLocalFile(file.path);
-
-    // 4. Get the prompt for this section
-    const prompt = getPrompt(section);
-
-    // 5. Process with LLM
-    const structuredData = await processWithLLM(prompt, transcribedText);
-
-    // 6. Create or reuse consultation
-    let consultationId = consultation_id;
-
-    if (!consultationId) {
-      const newConsultation = await createConsultation(patient_id, veterinarian_id);
-      consultationId = newConsultation.id;
+    if (!isValidSection(section)) {
+      throw AppError.validation(
+        `Sección inválida. Válidas: ${VALID_SECTIONS.join(', ')}`
+      );
+    }
+    if (!file && !text_input) {
+      throw AppError.validation('Se requiere archivo de audio o text_input');
+    }
+    if (!consultation_id && !patient_id) {
+      throw AppError.validation('Requiere consultation_id o patient_id');
     }
 
-    // 7. Upsert draft with DB enum section value
-    const dbSection = getDbSection(section);
-    const draft = await upsertDraft(consultationId, dbSection, structuredData, audioPath, transcribedText);
+    let consultationId = consultation_id;
+    if (!consultationId) {
+      const newConsultation = await consultationsRepo.create(req.supabase, req.veterinarianId, {
+        patient_id,
+        type: consultation_type,
+        chief_complaint,
+      });
+      consultationId = newConsultation.id;
+    } else if (chief_complaint) {
+      await consultationsRepo.updateStatus(req.supabase, req.veterinarianId, consultationId, {
+        chief_complaint,
+      });
+    }
 
-    // 8. Get full consultation state
-    const consultation = await getConsultation(consultationId);
+    let sourceText;
+    let audioPath = null;
+    let transcription = null;
 
-    // 9. Return complete response
-    res.json({
+    if (file) {
+      audioPath = await uploadAudio(file.path, file.originalname, file.mimetype);
+      transcription = await transcribeAudio(file.path);
+      deleteLocalFile(file.path);
+      sourceText = transcription;
+    } else {
+      sourceText = text_input;
+    }
+
+    const prompt = getPrompt(section);
+    const aiSuggested = await processWithLLM(prompt, sourceText);
+    const suggestedText = flattenAiToText(section, aiSuggested);
+
+    const sectionRow = await sectionsRepo.upsert(req.supabase, {
+      consultationId,
+      section,
+      transcription,
+      aiSuggested,
+      text: suggestedText,
+      audioUrl: audioPath,
+      overwriteText: !!overwrite_text,
+    });
+
+    const consultation = await consultationsRepo.getById(req.supabase, req.veterinarianId, consultationId);
+
+    return res.ok({
       consultation_id: consultationId,
       section,
       audio_path: audioPath,
-      transcription: transcribedText,
-      structured_data: structuredData,
-      draft,
+      transcription,
+      ai_suggested: aiSuggested,
+      suggested_text: suggestedText,
+      section_row: sectionRow,
       consultation,
     });
-  } catch (error) {
-    logger.error('Error al procesar consulta:', error.message);
-    deleteLocalFile(file.path);
-    res.status(500).json({ error: 'Error al procesar la consulta', details: error.message });
+  } catch (err) {
+    if (file?.path) deleteLocalFile(file.path);
+    logger.error('Error al procesar consulta:', err.message);
+    next(err);
   }
 }
 
-async function getConsultationById(req, res) {
+async function getConsultationById(req, res, next) {
   try {
-    const consultation = await getConsultation(req.params.id);
-    res.json(consultation);
-  } catch (error) {
-    logger.error('Error al obtener consulta:', error.message);
-    res.status(404).json({ error: 'Consulta no encontrada', details: error.message });
+    const consultation = await consultationsRepo.getById(req.supabase, req.veterinarianId, req.params.id);
+    if (!consultation) throw AppError.notFound('Consulta no encontrada');
+    return res.ok(consultation);
+  } catch (err) {
+    if (err.code === 'PGRST116') return next(AppError.notFound('Consulta no encontrada'));
+    next(err);
   }
 }
 
-async function finishConsultation(req, res) {
-  const { id } = req.params;
-  const { result, chief_complaint, primary_diagnosis } = req.body;
-
-  if (!result) {
-    return res.status(400).json({ error: 'Se requiere el campo "result" (discharge, hospitalization, deceased, referred)' });
-  }
-
+async function updateSection(req, res, next) {
   try {
-    const consultation = await closeConsultation(id, result, chief_complaint, primary_diagnosis);
-    res.json(consultation);
-  } catch (error) {
-    logger.error('Error al finalizar consulta:', error.message);
-    res.status(500).json({ error: 'Error al finalizar la consulta', details: error.message });
+    const { id, section } = req.params;
+    const existing = await consultationsRepo.getById(req.supabase, req.veterinarianId, id);
+    if (!existing) throw AppError.notFound('Consulta no encontrada');
+
+    const updated = await sectionsRepo.updateText(req.supabase, {
+      consultationId: id,
+      section,
+      text: req.body.text,
+      content: req.body.content,
+    });
+    return res.ok(updated);
+  } catch (err) {
+    next(err);
   }
 }
 
-module.exports = { processConsultation, getConsultationById, finishConsultation };
+async function pause(req, res, next) {
+  try {
+    const { reason, note } = req.body;
+    const updated = await consultationsRepo.pause(req.supabase, req.veterinarianId, req.params.id, reason, note);
+    return res.ok(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resume(req, res, next) {
+  try {
+    const updated = await consultationsRepo.resume(req.supabase, req.veterinarianId, req.params.id);
+    return res.ok(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function sign(req, res, next) {
+  try {
+    const updated = await consultationsRepo.sign(req.supabase, req.veterinarianId, req.params.id, req.body);
+    return res.ok(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  processConsultation,
+  getConsultationById,
+  updateSection,
+  pause,
+  resume,
+  sign,
+};
