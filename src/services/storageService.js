@@ -1,18 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
-const supabase = require('../config/supabaseClient');
+const { supabaseAdmin } = require('../config/supabaseClient');
 const logger = require('../utils/logger');
 
 const AUDIO_BUCKET = 'consultations-audio';
 const ATTACHMENTS_BUCKET = 'consultation-attachments';
 
 async function uploadFile(bucket, filePath, originalName, mimeType) {
+  if (!supabaseAdmin) {
+    throw new Error('Falta SUPABASE_SERVICE_ROLE_KEY para subir archivos');
+  }
+
   const ext = path.extname(originalName);
   const fileName = `${uuidv4()}${ext}`;
   const fileBuffer = fs.readFileSync(filePath);
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await supabaseAdmin.storage
     .from(bucket)
     .upload(fileName, fileBuffer, {
       contentType: mimeType || 'application/octet-stream',
