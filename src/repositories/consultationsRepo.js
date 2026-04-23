@@ -2,12 +2,12 @@ async function listRecentSigned(supabase, vetId, limit = 4) {
   const { data, error } = await supabase
     .from('consultations')
     .select(`
-      id, type, summary, primary_diagnosis, result, closed_at, created_at,
+      id, type, status, summary, primary_diagnosis, result, signed_at, created_at,
       patient:patients ( id, name, species )
     `)
     .eq('veterinarian_id', vetId)
     .eq('status', 'signed')
-    .order('closed_at', { ascending: false })
+    .order('signed_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
   return data || [];
@@ -96,7 +96,7 @@ async function sign(supabase, vetId, id, payload) {
     result: payload.result,
     summary: payload.summary || null,
     primary_diagnosis: payload.primary_diagnosis || null,
-    closed_at: new Date().toISOString(),
+    signed_at: new Date().toISOString(),
   });
 }
 

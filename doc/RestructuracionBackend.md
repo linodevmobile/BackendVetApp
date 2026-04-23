@@ -142,7 +142,7 @@
  │          Tabla           │ Acción │                                                   Campos clave                                                   │
  ├──────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
  │ consultations            │ Crear  │ id, patient_id, veterinarian_id, type (enum), status (enum), chief_complaint, summary, primary_diagnosis, result │
- │                          │        │  (enum), pause_reason (enum), pause_note, paused_at, closed_at, created_at                                       │
+ │                          │        │  (enum), pause_reason (enum), pause_note, paused_at, signed_at, created_at                                       │
  ├──────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
  │ consultation_sections    │ Crear  │ id, consultation_id, section (enum), text, audio_url, processed_at                                               │
  ├──────────────────────────┼────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤

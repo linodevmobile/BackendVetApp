@@ -129,7 +129,7 @@ CREATE TABLE consultations (
   pause_reason consultation_pause_reason,
   pause_note TEXT,
   paused_at TIMESTAMPTZ,
-  closed_at TIMESTAMPTZ,
+  signed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT chk_paused_fields CHECK (
@@ -273,7 +273,7 @@ CREATE INDEX idx_favs_vet ON vet_favorite_patients(vet_id);
 
 CREATE INDEX idx_consultations_patient ON consultations(patient_id);
 CREATE INDEX idx_consultations_vet_status ON consultations(veterinarian_id, status);
-CREATE INDEX idx_consultations_closed_at ON consultations(closed_at DESC) WHERE status = 'signed';
+CREATE INDEX idx_consultations_signed_at ON consultations(signed_at DESC) WHERE status = 'signed';
 
 CREATE INDEX idx_sections_consultation ON consultation_sections(consultation_id);
 CREATE INDEX idx_sections_consultation_section ON consultation_sections(consultation_id, section);

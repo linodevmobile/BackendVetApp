@@ -204,7 +204,7 @@ Pacientes actualmente hospitalizados por el vet autenticado, con progreso de tar
 }
 ```
 
-`performed_at` = `consultations.closed_at` (o `created_at` si no cerrada).
+`performed_at` = `consultations.signed_at` (o `created_at` si no cerrada).
 `type` requiere la columna agregada en §1.2.
 
 ### 3.4 (Opcional) `GET /dashboard/today` — respuesta agregada

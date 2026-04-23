@@ -59,10 +59,10 @@ async function getById(supabase, vetId, id) {
     supabase.from('vet_favorite_patients').select('patient_id').eq('vet_id', vetId).eq('patient_id', id).maybeSingle(),
     supabase
       .from('consultations')
-      .select('closed_at')
+      .select('signed_at')
       .eq('patient_id', id)
       .eq('status', 'signed')
-      .order('closed_at', { ascending: false })
+      .order('signed_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
@@ -70,7 +70,7 @@ async function getById(supabase, vetId, id) {
   return decorate(data, {
     has_alert: (alerts || []).length > 0,
     is_favorite: !!fav,
-    last_visit: last?.closed_at || null,
+    last_visit: last?.signed_at || null,
   });
 }
 
