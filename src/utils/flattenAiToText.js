@@ -1,4 +1,6 @@
-function asLines(label, value) {
+const { getLabel } = require('./sectionLabels');
+
+function asLines(label, value, section) {
   if (value === undefined || value === null || value === '') return null;
   if (Array.isArray(value)) {
     if (value.length === 0) return null;
@@ -6,7 +8,7 @@ function asLines(label, value) {
   }
   if (typeof value === 'object') {
     const inner = Object.entries(value)
-      .map(([k, v]) => asLines(k.replace(/_/g, ' '), v))
+      .map(([k, v]) => asLines(getLabel(section, k), v, section))
       .filter(Boolean)
       .join('\n');
     return inner ? `${label}:\n${inner}` : null;
@@ -14,18 +16,13 @@ function asLines(label, value) {
   return `${label}: ${value}`;
 }
 
-function flattenJson(obj) {
-  if (!obj || typeof obj !== 'object') return '';
-  const parts = Object.entries(obj)
-    .map(([k, v]) => asLines(k.replace(/_/g, ' '), v))
-    .filter(Boolean);
-  return parts.join('\n\n');
-}
-
 function flattenAiToText(section, aiJson) {
-  if (!aiJson) return '';
+  if (!aiJson || typeof aiJson !== 'object') return '';
   try {
-    return flattenJson(aiJson);
+    const parts = Object.entries(aiJson)
+      .map(([k, v]) => asLines(getLabel(section, k), v, section))
+      .filter(Boolean);
+    return parts.join('\n\n');
   } catch (_err) {
     return typeof aiJson === 'string' ? aiJson : JSON.stringify(aiJson, null, 2);
   }

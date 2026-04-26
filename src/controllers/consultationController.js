@@ -1,95 +1,17 @@
-const { transcribeAudio } = require('../services/transcriptionService');
-const { getPrompt, isValidSection, VALID_SECTIONS } = require('../services/promptRouter');
-const { processWithLLM } = require('../services/llmService');
 const { uploadAudio, deleteLocalFile } = require('../services/storageService');
-const { flattenAiToText } = require('../utils/flattenAiToText');
 const consultationsRepo = require('../repositories/consultationsRepo');
 const sectionsRepo = require('../repositories/sectionsRepo');
 const AppError = require('../utils/AppError');
-const logger = require('../utils/logger');
 
-async function processConsultation(req, res, next) {
-  const file = req.file;
-
+async function createConsultation(req, res, next) {
   try {
-    const {
-      section,
-      consultation_id,
+    const { patient_id, type } = req.body;
+    const created = await consultationsRepo.create(req.supabase, req.veterinarianId, {
       patient_id,
-      consultation_type,
-      chief_complaint,
-      text_input,
-      overwrite_text,
-    } = req.body;
-
-    if (!isValidSection(section)) {
-      throw AppError.validation(
-        `Sección inválida. Válidas: ${VALID_SECTIONS.join(', ')}`
-      );
-    }
-    if (!file && !text_input) {
-      throw AppError.validation('Se requiere archivo de audio o text_input');
-    }
-    if (!consultation_id && !patient_id) {
-      throw AppError.validation('Requiere consultation_id o patient_id');
-    }
-
-    let consultationId = consultation_id;
-    if (!consultationId) {
-      const newConsultation = await consultationsRepo.create(req.supabase, req.veterinarianId, {
-        patient_id,
-        type: consultation_type,
-        chief_complaint,
-      });
-      consultationId = newConsultation.id;
-    } else if (chief_complaint) {
-      await consultationsRepo.updateStatus(req.supabase, req.veterinarianId, consultationId, {
-        chief_complaint,
-      });
-    }
-
-    let sourceText;
-    let audioPath = null;
-    let transcription = null;
-
-    if (file) {
-      audioPath = await uploadAudio(file.path, file.originalname, file.mimetype);
-      transcription = await transcribeAudio(file.path);
-      deleteLocalFile(file.path);
-      sourceText = transcription;
-    } else {
-      sourceText = text_input;
-    }
-
-    const prompt = getPrompt(section);
-    const aiSuggested = await processWithLLM(prompt, sourceText);
-    const suggestedText = flattenAiToText(section, aiSuggested);
-
-    const sectionRow = await sectionsRepo.upsert(req.supabase, {
-      consultationId,
-      section,
-      transcription,
-      aiSuggested,
-      text: suggestedText,
-      audioUrl: audioPath,
-      overwriteText: !!overwrite_text,
+      type,
     });
-
-    const consultation = await consultationsRepo.getById(req.supabase, req.veterinarianId, consultationId);
-
-    return res.ok({
-      consultation_id: consultationId,
-      section,
-      audio_path: audioPath,
-      transcription,
-      ai_suggested: aiSuggested,
-      suggested_text: suggestedText,
-      section_row: sectionRow,
-      consultation,
-    });
+    return res.ok(created, null, 201);
   } catch (err) {
-    if (file?.path) deleteLocalFile(file.path);
-    logger.error('Error al procesar consulta:', err.message);
     next(err);
   }
 }
@@ -106,19 +28,36 @@ async function getConsultationById(req, res, next) {
 }
 
 async function updateSection(req, res, next) {
+  const file = req.file;
   try {
     const { id, section } = req.params;
     const existing = await consultationsRepo.getById(req.supabase, req.veterinarianId, id);
     if (!existing) throw AppError.notFound('Consulta no encontrada');
 
-    const updated = await sectionsRepo.updateText(req.supabase, {
+    const fields = {};
+    if (req.body.text !== undefined) fields.text = req.body.text;
+    if (req.body.content !== undefined) fields.content = req.body.content;
+    if (req.body.transcription !== undefined) fields.transcription = req.body.transcription;
+    if (req.body.ai_suggested !== undefined) fields.ai_suggested = req.body.ai_suggested;
+
+    if (file) {
+      const audioUrl = await uploadAudio(file.path, file.originalname, file.mimetype);
+      deleteLocalFile(file.path);
+      fields.audio_url = audioUrl;
+    }
+
+    if (Object.keys(fields).length === 0) {
+      throw AppError.validation('Requiere al menos un campo (text, content, transcription, ai_suggested) o un archivo de audio');
+    }
+
+    const updated = await sectionsRepo.upsertPartial(req.supabase, {
       consultationId: id,
       section,
-      text: req.body.text,
-      content: req.body.content,
+      fields,
     });
     return res.ok(updated);
   } catch (err) {
+    if (file?.path) deleteLocalFile(file.path);
     next(err);
   }
 }
@@ -152,7 +91,7 @@ async function sign(req, res, next) {
 }
 
 module.exports = {
-  processConsultation,
+  createConsultation,
   getConsultationById,
   updateSection,
   pause,

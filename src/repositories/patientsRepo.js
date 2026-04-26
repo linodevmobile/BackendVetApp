@@ -35,6 +35,7 @@ async function create(supabase, vetId, payload) {
     owner_name: payload.owner_name,
     owner_phone: payload.owner_phone || null,
     owner_email: payload.owner_email || null,
+    owner_address: payload.owner_address || null,
     created_by_vet_id: vetId,
   };
   const { data, error } = await supabase
@@ -118,7 +119,7 @@ async function list(supabase, vetId, { search, filter, limit, offset }) {
 async function update(supabase, vetId, id, changes) {
   const allowed = [
     'name', 'species', 'breed', 'sex', 'date_of_birth', 'weight_kg',
-    'microchip', 'owner_name', 'owner_phone', 'owner_email',
+    'microchip', 'owner_name', 'owner_phone', 'owner_email', 'owner_address',
   ];
   const patch = {};
   for (const k of allowed) if (changes[k] !== undefined) patch[k] = changes[k];

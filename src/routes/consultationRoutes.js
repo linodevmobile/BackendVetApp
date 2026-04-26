@@ -4,7 +4,6 @@ const attachmentCtrl = require('../controllers/attachmentController');
 const upload = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
 const {
-  processSchema,
   sectionParamSchema,
   updateSectionBodySchema,
   pauseSchema,
@@ -14,17 +13,11 @@ const { uploadSchema } = require('../validators/attachmentSchema');
 
 const router = express.Router();
 
-router.post(
-  '/process',
-  upload.single('audio'),
-  validate({ body: processSchema }),
-  ctrl.processConsultation
-);
-
 router.get('/:id', ctrl.getConsultationById);
 
 router.patch(
   '/:id/sections/:section',
+  upload.single('audio'),
   validate({ params: sectionParamSchema, body: updateSectionBodySchema }),
   ctrl.updateSection
 );

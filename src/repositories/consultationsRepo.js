@@ -17,7 +17,7 @@ async function listByStatus(supabase, vetId, status) {
   const { data, error } = await supabase
     .from('consultations')
     .select(`
-      id, type, status, chief_complaint, summary, pause_reason, pause_note, paused_at, created_at,
+      id, type, status, summary, pause_reason, pause_note, paused_at, created_at,
       patient:patients ( id, name, species )
     `)
     .eq('veterinarian_id', vetId)
@@ -48,7 +48,6 @@ async function create(supabase, vetId, payload) {
     patient_id: payload.patient_id,
     veterinarian_id: vetId,
     type: payload.type || 'routine',
-    chief_complaint: payload.chief_complaint || null,
     status: 'in_progress',
   };
   const { data, error } = await supabase
