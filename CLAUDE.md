@@ -10,47 +10,48 @@ Backend API for a veterinary clinical records app. Receives audio recordings fro
 
 - `npm start` — Run the server
 - `npm run dev` — Run with auto-reload (--watch)
-- Test endpoint: `curl -X POST http://localhost:3000/consultation/process -F "audio=@path/to/file.mp3" -F "section=anamnesis"`
 
 ## Architecture
 
-Single endpoint `POST /consultation/process` handles all clinical sections. The request flow is:
+The app is migrating from a monolithic `POST /consultation/process` endpoint toward a separation:
 
-1. **consultationRoutes** — Multer receives audio file (max 20MB), stores temporarily in `/uploads`
-2. **consultationController** — Orchestrates the full pipeline:
-   - Upload audio → Supabase Storage (bucket: `consultations-audio`)
-   - Transcribe audio → OpenAI `gpt-4o-transcribe`
-   - Delete local temp file
-   - Select prompt via **promptRouter** based on `section` field
-   - Process transcription → OpenAI `gpt-4o-mini` with `response_format: json_object`
-   - Create/update consultation in Supabase DB (table: `consultations`)
-   - Return full response with transcription + structured data + consultation state
+1. **AI utility (stateless, pure)** — `POST /ai/process-section` receives audio + section, returns `{ transcription, ai_suggested, suggested_text }`. Does NOT touch DB or Storage.
+2. **Consultation lifecycle** — `POST /consultations` creates an empty consultation; `PATCH /consultations/:id/sections/:section` upserts section data (autosave/blur/pause from client).
+
+The legacy `POST /consultation/process` may still exist during migration but is being removed.
 
 ### Key design decisions
 
-- **promptRouter** is the central registry: maps section names to prompt strings and validates sections. To add a new section, add the prompt file and register it here.
-- **stateService** uses dynamic column updates (`{ [section]: data }`) — the section name must match a JSONB column in the `consultations` table.
-- All prompts instruct GPT to return flat JSON with simple string values/arrays to keep UI rendering easy. Avoid nested objects in prompt output schemas.
+- **promptRouter** is the central registry: maps section names to prompt strings and validates sections. Section keys are in English and match the `clinical_section` enum in the DB.
+- **sectionLabels** (`src/utils/sectionLabels.js`) holds the Spanish UI labels for each AI-output JSON key per section. Routing identifiers are English; labels for the doctor's UI are Spanish.
+- **flattenAiToText(section, aiJson)** uses sectionLabels to render the AI JSON as labeled text shown in the UI.
+- All prompts instruct GPT to return flat JSON. Avoid nested objects.
+- The `chief_complaint` section is special: its audio is the OWNER's voice. Its prompt preserves the owner's words and avoids medical reinterpretation. All other sections are dictated by the vet in clinical terminology.
 
 ## Clinical Sections (valid `section` values)
 
-| Section key | DB column | Prompt file |
+| Section key | UI label (ES) | Prompt file |
 |---|---|---|
-| `anamnesis` | anamnesis | anamnesisPrompt.js |
-| `examen_fisico` | examen_fisico | physical-examPrompt.js |
-| `abordaje_diagnostico` | abordaje_diagnostico | diagnostic-approachPrompt.js |
-| `diagnostico_presuntivo` | diagnostico_presuntivo | presumptive-diagnosisPrompt.js |
-| `diagnostico_definitivo` | diagnostico_definitivo | definitive-diagnosisPrompt.js |
-| `plan_terapeutico` | plan_terapeutico | treatment-planPrompt.js |
-| `pronostico_evolucion` | pronostico_evolucion | prognosisPrompt.js |
+| `chief_complaint` | Motivo de consulta | chief-complaintPrompt.js |
+| `anamnesis` | Anamnesis | anamnesisPrompt.js |
+| `physical_exam` | Examen físico | physical-examPrompt.js |
+| `problems` | Problemas | problemsPrompt.js |
+| `diagnostic_approach` | Abordaje diagnóstico | diagnostic-approachPrompt.js |
+| `complementary_exams` | Exámenes complementarios | complementary-examsPrompt.js |
+| `presumptive_diagnosis` | Diagnóstico presuntivo | presumptive-diagnosisPrompt.js |
+| `definitive_diagnosis` | Diagnóstico definitivo | definitive-diagnosisPrompt.js |
+| `prescription` | Receta | prescriptionPrompt.js |
+| `prognosis` | Pronóstico | prognosisPrompt.js |
+
+Section data lives in the `consultation_sections` table (one row per consultation×section). The `consultations` table holds metadata (status, type, summary, primary_diagnosis, result, pause/sign timestamps).
 
 ## External Services
 
 - **OpenAI**: Transcription (`gpt-4o-transcribe`) + LLM processing (`gpt-4o-mini`)
-- **Supabase**: PostgreSQL (table `consultations` with JSONB columns) + Storage (bucket `consultations-audio`)
+- **Supabase**: PostgreSQL + Storage (bucket `consultations-audio`)
 
 ## Code Conventions
 
-- Code identifiers in English, user-facing messages in Spanish
-- CommonJS (`require`/`module.exports`), not ES modules
-- Prompts are in Spanish (clinical veterinary domain, small animals)
+- Code identifiers, DB column names, and section enum values in English. UI labels (in `sectionLabels.js`) and prompt instructions in Spanish.
+- CommonJS (`require`/`module.exports`), not ES modules.
+- Prompts are written in Spanish (clinical veterinary domain, small animals).
