@@ -1,5 +1,13 @@
  Plan de reestructuración backend VetApp
 
+ > **Nota histórica (2026-04-26)**: este documento fue el plan de ejecución del backend v2. Casi todo está implementado. Para el estado actual referirse a `README.md` (endpoints) y `GUIA_DESARROLLO.md` (cómo trabajar). Cambios posteriores a este plan:
+ >
+ > - Eliminado `POST /consultation/process` (era multi-responsabilidad). Reemplazado por: `POST /ai/process-section` (utilidad pura IA, no toca DB), `POST /consultations` (crear consulta vacía) y `PATCH /consultation/:id/sections/:section` (autosave/blur/pause con multipart opcional para audio).
+ > - Enum `clinical_section` migrado a inglés, con nueva sección `chief_complaint` (audio del dueño, no del veterinario).
+ > - Columna `consultations.chief_complaint` removida (movida a `consultation_sections` como sección).
+ > - `patients.owner_address` agregada.
+ > - Labels en español para UI viven aparte en `src/utils/sectionLabels.js` (separación identificadores EN / labels ES).
+
  Contexto
 
  Cliente Flutter tiene gran parte de UI construida (auth, dashboard, pacientes, consulta con pausa) pero la mayoría consume datos mock. El backend actual

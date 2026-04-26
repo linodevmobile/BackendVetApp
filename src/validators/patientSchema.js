@@ -15,6 +15,7 @@ const createSchema = z.object({
   owner_name: z.string().min(1),
   owner_phone: z.string().optional(),
   owner_email: z.string().email().optional(),
+  owner_address: z.string().optional(),
 }).refine((v) => v.date_of_birth || typeof v.age_years === 'number', {
   message: 'Debe indicarse date_of_birth o age_years',
 });
@@ -30,6 +31,7 @@ const updateSchema = z.object({
   owner_name: z.string().optional(),
   owner_phone: z.string().optional(),
   owner_email: z.string().email().optional(),
+  owner_address: z.string().optional(),
 }).refine((v) => Object.keys(v).length > 0, { message: 'Requiere al menos un campo' });
 
 const listQuerySchema = z.object({

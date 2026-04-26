@@ -1,3 +1,4 @@
+const CHIEF_COMPLAINT_PROMPT = require('../prompts/chief-complaintPrompt');
 const ANAMNESIS_PROMPT = require('../prompts/anamnesisPrompt');
 const PHYSICAL_EXAM_PROMPT = require('../prompts/physical-examPrompt');
 const PROBLEMS_PROMPT = require('../prompts/problemsPrompt');
@@ -5,20 +6,21 @@ const DIAGNOSTIC_APPROACH_PROMPT = require('../prompts/diagnostic-approachPrompt
 const COMPLEMENTARY_EXAMS_PROMPT = require('../prompts/complementary-examsPrompt');
 const PRESUMPTIVE_DIAGNOSIS_PROMPT = require('../prompts/presumptive-diagnosisPrompt');
 const DEFINITIVE_DIAGNOSIS_PROMPT = require('../prompts/definitive-diagnosisPrompt');
-const TREATMENT_PLAN_PROMPT = require('../prompts/treatment-planPrompt');
+const PRESCRIPTION_PROMPT = require('../prompts/prescriptionPrompt');
 const PROGNOSIS_PROMPT = require('../prompts/prognosisPrompt');
 
-// Keys match DB enum `clinical_section` (Spanish) — no translation layer.
+// Keys match DB enum `clinical_section` (English, no translation layer).
 const PROMPTS = {
+  chief_complaint: CHIEF_COMPLAINT_PROMPT,
   anamnesis: ANAMNESIS_PROMPT,
-  examen_fisico: PHYSICAL_EXAM_PROMPT,
-  problemas: PROBLEMS_PROMPT,
-  abordaje_diagnostico: DIAGNOSTIC_APPROACH_PROMPT,
-  examenes_complementarios: COMPLEMENTARY_EXAMS_PROMPT,
-  diagnostico_presuntivo: PRESUMPTIVE_DIAGNOSIS_PROMPT,
-  diagnostico_definitivo: DEFINITIVE_DIAGNOSIS_PROMPT,
-  plan_terapeutico: TREATMENT_PLAN_PROMPT,
-  pronostico_evolucion: PROGNOSIS_PROMPT,
+  physical_exam: PHYSICAL_EXAM_PROMPT,
+  problems: PROBLEMS_PROMPT,
+  diagnostic_approach: DIAGNOSTIC_APPROACH_PROMPT,
+  complementary_exams: COMPLEMENTARY_EXAMS_PROMPT,
+  presumptive_diagnosis: PRESUMPTIVE_DIAGNOSIS_PROMPT,
+  definitive_diagnosis: DEFINITIVE_DIAGNOSIS_PROMPT,
+  prescription: PRESCRIPTION_PROMPT,
+  prognosis: PROGNOSIS_PROMPT,
 };
 
 const VALID_SECTIONS = Object.keys(PROMPTS);

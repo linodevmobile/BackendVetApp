@@ -44,6 +44,40 @@ async function updateText(supabase, { consultationId, section, text, content }) 
   return data;
 }
 
+// Partial upsert: updates only provided fields, inserts row if missing.
+// Used by PATCH /consultations/:id/sections/:section to accept incremental
+// drafts from the client (text, content, transcription, ai_suggested, audio_url).
+async function upsertPartial(supabase, { consultationId, section, fields }) {
+  const patch = { processed_at: new Date().toISOString(), ...fields };
+
+  const { data: existing } = await supabase
+    .from('consultation_sections')
+    .select('id')
+    .eq('consultation_id', consultationId)
+    .eq('section', section)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('consultation_sections')
+      .update(patch)
+      .eq('consultation_id', consultationId)
+      .eq('section', section)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('consultation_sections')
+    .insert({ consultation_id: consultationId, section, ...patch })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function listByConsultation(supabase, consultationId) {
   const { data, error } = await supabase
     .from('consultation_sections')
@@ -53,4 +87,4 @@ async function listByConsultation(supabase, consultationId) {
   return data || [];
 }
 
-module.exports = { upsert, updateText, listByConsultation };
+module.exports = { upsert, updateText, upsertPartial, listByConsultation };

@@ -3,20 +3,9 @@ const { VALID_SECTIONS } = require('../services/promptRouter');
 
 const sectionEnum = z.enum(VALID_SECTIONS);
 
-// Used when process/ receives multipart/form-data — fields are strings
-const processSchema = z.object({
-  section: sectionEnum,
-  consultation_id: z.string().uuid().optional(),
-  patient_id: z.string().uuid().optional(),
-  consultation_type: z.enum(['routine', 'surgery', 'emergency']).optional(),
-  chief_complaint: z.string().optional(),
-  text_input: z.string().optional(),
-  overwrite_text: z
-    .union([z.boolean(), z.literal('true'), z.literal('false')])
-    .optional()
-    .transform((v) => v === true || v === 'true'),
-}).refine((v) => v.consultation_id || v.patient_id, {
-  message: 'Requiere consultation_id o patient_id',
+const createConsultationSchema = z.object({
+  patient_id: z.string().uuid(),
+  type: z.enum(['routine', 'surgery', 'emergency']).optional(),
 });
 
 const sectionParamSchema = z.object({
@@ -24,11 +13,19 @@ const sectionParamSchema = z.object({
   section: sectionEnum,
 });
 
+// Multipart-friendly: JSON fields may arrive as strings (from form-data) and are
+// parsed in-place. `audio` (file) is handled by multer; controller validates that
+// at least one of {text, content, transcription, ai_suggested, audio} is provided.
+const jsonOrObject = z
+  .union([z.string(), z.record(z.string(), z.any())])
+  .optional()
+  .transform((v) => (typeof v === 'string' ? JSON.parse(v) : v));
+
 const updateSectionBodySchema = z.object({
   text: z.string().optional(),
-  content: z.record(z.string(), z.any()).optional(),
-}).refine((v) => v.text !== undefined || v.content !== undefined, {
-  message: 'Requiere text o content',
+  content: jsonOrObject,
+  transcription: z.string().optional(),
+  ai_suggested: jsonOrObject,
 });
 
 const pauseSchema = z.object({
@@ -43,7 +40,7 @@ const signSchema = z.object({
 });
 
 module.exports = {
-  processSchema,
+  createConsultationSchema,
   sectionParamSchema,
   updateSectionBodySchema,
   pauseSchema,

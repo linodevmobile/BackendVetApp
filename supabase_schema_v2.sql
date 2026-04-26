@@ -2,8 +2,10 @@
 -- VetApp Backend — Database Schema v2 (consolidated)
 -- PostgreSQL / Supabase
 -- ============================================
--- Naming: tables and columns in English.
--- Clinical section enum uses Spanish keys as stored in UI requests.
+-- Naming: tables, columns and enums in English.
+-- UI-facing labels (Spanish) live in src/utils/sectionLabels.js for each section's
+-- AI-output keys; routing identifiers (section enum, prompt keys, URL params) stay
+-- in English end-to-end.
 -- Hybrid section storage: transcription (raw) + ai_suggested (JSONB audit
 -- trail) + text (vet-editable final, what UI shows/saves) + content (optional).
 -- RLS: authenticated policies isolate data per vet.
@@ -30,15 +32,16 @@ CREATE TYPE consultation_result AS ENUM ('discharge', 'hospitalization', 'deceas
 CREATE TYPE consultation_pause_reason AS ENUM ('labs', 'imaging', 'procedure', 'owner', 'other');
 
 CREATE TYPE clinical_section AS ENUM (
+  'chief_complaint',
   'anamnesis',
-  'examen_fisico',
-  'problemas',
-  'abordaje_diagnostico',
-  'examenes_complementarios',
-  'diagnostico_presuntivo',
-  'diagnostico_definitivo',
-  'plan_terapeutico',
-  'pronostico_evolucion'
+  'physical_exam',
+  'problems',
+  'diagnostic_approach',
+  'complementary_exams',
+  'presumptive_diagnosis',
+  'definitive_diagnosis',
+  'prescription',
+  'prognosis'
 );
 
 CREATE TYPE appointment_status AS ENUM ('scheduled', 'now', 'completed', 'cancelled');
@@ -83,6 +86,7 @@ CREATE TABLE patients (
   owner_name TEXT NOT NULL,
   owner_phone TEXT,
   owner_email TEXT,
+  owner_address TEXT,
   created_by_vet_id UUID NOT NULL REFERENCES veterinarians(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -122,7 +126,6 @@ CREATE TABLE consultations (
   veterinarian_id UUID NOT NULL REFERENCES veterinarians(id) ON DELETE RESTRICT,
   type consultation_type NOT NULL DEFAULT 'routine',
   status consultation_status NOT NULL DEFAULT 'in_progress',
-  chief_complaint TEXT,
   summary TEXT,
   primary_diagnosis TEXT,
   result consultation_result,

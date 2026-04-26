@@ -1,25 +1,31 @@
 # BackendVetApp
 
-API backend para gestión de historias clínicas veterinarias en pequeños animales. Recibe audio (o texto) por cada sección clínica, lo transcribe con OpenAI, extrae datos estructurados vía LLM y los persiste en Supabase con una capa editable por el vet.
+API backend para gestión de historias clínicas veterinarias en pequeños animales. La IA procesa audio o texto por sección clínica como utilidad pura (sin tocar DB) y devuelve transcripción + texto sugerido. El cliente decide cuándo persistir vía endpoints incrementales sobre `consultation_sections`.
 
-## Flujo por sección
+## Arquitectura
+
+Tres responsabilidades separadas:
+
+1. **Utilidad IA (stateless)** — `POST /ai/process-section` recibe audio/texto + sección, devuelve `{ transcription, ai_suggested, suggested_text }`. No toca DB ni Storage. Ideal para regenerar resultados sin contaminar el estado.
+2. **Lifecycle de consulta** — `POST /consultations` crea la consulta vacía al inicio (habilita pausa desde el primer momento).
+3. **Persistencia incremental** — `PATCH /consultation/:id/sections/:section` acepta cualquier subset de campos (`text`, `content`, `transcription`, `ai_suggested`) + audio opcional. Sirve como autosave / blur / pause desde el cliente.
 
 ```
-audio → transcripción (Whisper) → LLM (GPT) → ai_suggested (JSONB auditoría)
-                                            → text (editable por vet, lo que UI muestra/guarda)
-                                            → audio_url, processed_at
+[cliente Flutter]
+  ├── grabar audio → POST /ai/process-section → {transcription, ai_suggested, suggested_text}
+  ├── editar texto en UI (estado local)
+  └── sync (debounce 2s / blur sección / pause / sign)
+        └── PATCH /consultation/:id/sections/:section { text, [audio], [transcription], [ai_suggested] }
 ```
-
-Alternativa: la misma ruta acepta `text_input` sin audio cuando el vet prefiere tipear.
 
 ## Stack
 
 - **Node.js + Express 5** — API
-- **OpenAI** — `whisper-1` (transcripción) + `gpt-4o-mini` (extracción estructurada)
+- **OpenAI** — `whisper-1` (transcripción) + `gpt-4o-mini` (extracción estructurada JSON)
 - **Supabase** — PostgreSQL + Storage + Auth (JWT)
 - **Multer** — multipart uploads
 - **Zod** — validación de requests
-- **express-rate-limit** — throttling en auth y process
+- **express-rate-limit** — throttling en auth y endpoints AI
 
 ## Setup
 
@@ -34,7 +40,7 @@ cp .env.example .env  # completar keys
 OPENAI_API_KEY=...
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...   # requerido para rollback en registro
+SUPABASE_SERVICE_ROLE_KEY=...   # requerido para Storage uploads y registro
 PORT=3000
 ```
 
@@ -43,8 +49,8 @@ PORT=3000
 Ejecutar `supabase_schema_v2.sql` en el SQL Editor de Supabase. **Nota**: el script ejecuta `DROP SCHEMA public CASCADE` — solo aplicar en dev/fresh project.
 
 Define:
-- Enums: `consultation_type`, `consultation_status`, `consultation_result`, `consultation_pause_reason`, `clinical_section` (9 valores), `appointment_status`, `alert_severity`, `patient_species`, `patient_sex`
-- Tablas: `veterinarians`, `patients`, `patient_alerts`, `vet_favorite_patients`, `consultations`, `consultation_sections` (hybrid), `consultation_attachments`, `appointments` + tablas Fase 2 hospitalización
+- Enums: `consultation_type`, `consultation_status`, `consultation_result`, `consultation_pause_reason`, `clinical_section` (10 valores en inglés), `appointment_status`, `alert_severity`, `patient_species`, `patient_sex`
+- Tablas: `veterinarians`, `patients`, `patient_alerts`, `vet_favorite_patients`, `consultations`, `consultation_sections` (modelo híbrido), `consultation_attachments`, `appointments` + tablas Fase 2 hospitalización
 - RLS authenticated por vet
 - Buckets `consultations-audio` y `consultation-attachments`
 
@@ -73,10 +79,14 @@ Errores:
 
 Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `INTERNAL`, `RATE_LIMIT`.
 
-## Endpoints principales
+## Endpoints
+
+### Health (warmup)
+- `GET /health` — sin auth. Devuelve `{ status: 'ok' }`. Usar desde el splash del cliente Flutter en fire-and-forget para despertar el server (Render free tier duerme tras inactividad).
+- `GET /` — sin auth. Catálogo completo de endpoints + `valid_sections`. Útil para discovery, payload más pesado.
 
 ### Auth
-- `POST /auth/register` — `{ email, password, full_name, license_number?, phone?, salutation? }` → devuelve `veterinarian` con `salutation` (auto-calculada como `Dr. <Apellido>` si no se envía).
+- `POST /auth/register` — `{ email, password, full_name, license_number?, phone?, salutation? }` → `veterinarian` con `salutation` autocalculada (`Dr. <Apellido>`) si no se envía.
 - `POST /auth/login` — `{ email, password }` → `{ session: { access_token, refresh_token, expires_at }, veterinarian }`.
 
 ### Veterinarians
@@ -84,7 +94,7 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 
 ### Patients
 - `GET /patients?search=&filter=(all|today_agenda|favorites|recent)&limit=&offset=`
-- `POST /patients` — acepta `age_years` (alternativa a `date_of_birth`).
+- `POST /patients` — `{ name, species, breed?, sex, date_of_birth | age_years, weight_kg?, microchip?, owner_name, owner_phone?, owner_email?, owner_address? }`
 - `GET /patients/:id` — incluye `age_years`, `last_visit`, `has_alert`, `is_favorite`.
 - `PATCH /patients/:id`
 - `GET /patients/favorites`
@@ -98,18 +108,25 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 - `POST /appointments` — `{ patient_id, scheduled_at, reason?, status?, urgent? }`
 - `PATCH /appointments/:id`, `DELETE /appointments/:id`
 
-### Consultation (dashboard views)
+### Consultations (collection)
 - `GET /consultations/recent?limit=4` — firmadas recientes.
 - `GET /consultations?status=(in_progress|paused|signed)`.
+- `POST /consultations` — crea consulta vacía. `{ patient_id, type? }` → `{ id, status: 'in_progress', ... }`.
 
-### Consultation (flujo)
-- `POST /consultation/process` — multipart con **una** de:
+### AI utility (stateless)
+- `POST /ai/process-section` — multipart con **una** de:
   - `audio` (file, máx 20MB)
   - `text_input` (string)
 
-  Campos adicionales: `section` (enum), `consultation_id` (UUID — si se omite se crea), `patient_id` (requerido en primera llamada), `consultation_type` (routine|surgery|emergency), `chief_complaint` (string), `overwrite_text` (boolean — default false para preservar edición manual).
+  Más `section` (enum). Devuelve `{ section, transcription, ai_suggested, suggested_text }`. No persiste nada.
+
+### Consultation (item)
 - `GET /consultation/:id` — consulta con `sections` y `attachments` embebidos.
-- `PATCH /consultation/:id/sections/:section` — `{ text?, content? }` — solo muta lo editable; `ai_suggested` se preserva intacto.
+- `PATCH /consultation/:id/sections/:section` — multipart con cualquier subset:
+  - `text` (string), `content` (JSON), `transcription` (string), `ai_suggested` (JSON)
+  - `audio` (file opcional — se sube a Storage y se persiste como `audio_url`)
+
+  Upsert parcial: si la fila no existe, se crea; si existe, se actualizan solo los campos provistos.
 - `PATCH /consultation/:id/pause` — `{ reason: labs|imaging|procedure|owner|other, note? }`
 - `PATCH /consultation/:id/resume`
 - `PATCH /consultation/:id/sign` — `{ result: discharge|hospitalization|deceased|referred, summary?, primary_diagnosis? }` (alias `/close`)
@@ -117,24 +134,24 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 - `GET /consultation/:id/attachments`
 - `DELETE /consultation/:id/attachments/:attachmentId`
 
-## Secciones clínicas (9)
+## Secciones clínicas (10)
 
-`anamnesis`, `examen_fisico`, `problemas`, `abordaje_diagnostico`, `examenes_complementarios`, `diagnostico_presuntivo`, `diagnostico_definitivo`, `plan_terapeutico`, `pronostico_evolucion`.
+`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `presumptive_diagnosis`, `definitive_diagnosis`, `prescription`, `prognosis`.
 
-Cada sección tiene un prompt propio en `src/prompts/`.
+Cada sección tiene un prompt en `src/prompts/`. Los identificadores de routing son inglés; los labels visibles al doctor (español) viven en `src/utils/sectionLabels.js`. La sección `chief_complaint` es la única alimentada por audio del **dueño** (no del veterinario) — su prompt evita reinterpretación médica.
 
-## Hybrid sections — modelo de datos
+## Modelo de datos `consultation_sections`
 
 | Campo | Propósito |
 |---|---|
 | `transcription` | Texto crudo del audio |
-| `ai_suggested` | JSONB con la salida estructurada del LLM — audit trail inmutable |
+| `ai_suggested` | JSONB con la salida estructurada del LLM — audit trail |
 | `text` | Texto final editable por el vet, lo que muestra/guarda la UI |
-| `content` | JSONB opcional (mirror estructurado si se parsea edición) |
+| `content` | JSONB opcional (estructura paralela a `ai_suggested` para edición) |
 | `audio_url` | Path en Storage |
 | `processed_at` | Timestamp del último procesamiento |
 
-Política: al re-procesar una sección que ya tiene `text` editado, el valor editado se **preserva** salvo `overwrite_text=true`.
+Como la utilidad IA es pura, el cliente regenera cuantas veces quiera sin pisar nada. Solo cuando hace `PATCH .../sections/:section` se persiste, y solo lo que envía.
 
 ## Estructura del proyecto
 
@@ -143,12 +160,12 @@ src/
 ├── config/         # Supabase + OpenAI clients
 ├── middlewares/    # auth, responseWrapper, errorHandler, validate, upload, requestId, rateLimiters
 ├── validators/     # zod schemas por dominio
-├── controllers/    # orquestación
+├── controllers/    # orquestación (incluye aiController y consultationController)
 ├── repositories/   # acceso a tablas Supabase
 ├── services/       # llmService, promptRouter, transcriptionService, storageService
-├── prompts/        # 9 prompts clínicos
+├── prompts/        # 10 prompts clínicos + _shared/transcriptionRules.js
 ├── routes/         # Express routers
-├── utils/          # AppError, logger, safeJsonParse, flattenAiToText, salutation
+├── utils/          # AppError, logger, safeJsonParse, flattenAiToText, sectionLabels, salutation
 ├── app.js
 └── server.js
 ```
@@ -157,5 +174,5 @@ src/
 
 Render auto-despliega desde la rama configurada. Antes del primer deploy contra la v2:
 1. Completar `SUPABASE_SERVICE_ROLE_KEY` en Environment.
-2. Ejecutar `supabase_schema_v2.sql` en Supabase.
+2. Ejecutar `supabase_schema_v2.sql` en Supabase (o aplicar migraciones incrementales si ya hay datos).
 3. Verificar buckets creados.

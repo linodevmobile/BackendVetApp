@@ -1,5 +1,12 @@
 # Spec de Backend — Vistas Dashboard (Hoy) y Pacientes
 
+> **Nota histórica (2026-04-26)**: este documento fue el handoff inicial del cliente Flutter al backend. Casi todo lo que pide ya está implementado. Para la API actual ir al `README.md` (endpoints) y `GUIA_DESARROLLO.md` (cómo agregar/cambiar). Las diferencias relevantes contra esta spec:
+>
+> - `vet_favorite_patients` usa `vet_id` (no `veterinarian_id`).
+> - `patients` ya tiene `owner_address` (no listado abajo).
+> - Las secciones clínicas migraron a inglés: `chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `presumptive_diagnosis`, `definitive_diagnosis`, `prescription`, `prognosis`.
+> - El endpoint `POST /consultation/process` fue eliminado y reemplazado por: `POST /ai/process-section` (utilidad pura IA, sin DB) + `POST /consultations` (crear) + `PATCH /consultation/:id/sections/:section` (autosave/blur/pause).
+
 Documento de handoff al backend con los **endpoints requeridos** y los **gaps de schema** detectados tras implementar las pantallas de Dashboard y Pacientes en el cliente Flutter.
 
 Fuente del análisis: `supabase_schema_v2.sql` + colección Postman actual + entities Riverpod ya construidas en el cliente.
