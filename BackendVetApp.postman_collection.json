@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "BackendVetApp v2",
-    "description": "API backend veterinaria — v2.\n\n## Arquitectura\nLa IA es ahora una **utilidad pura** que NO toca DB ni Storage. El cliente decide cuándo persistir los resultados vía endpoints incrementales.\n\n## Flujo recomendado\n1. `POST /auth/login` → guarda `access_token`.\n2. `POST /patients` → crea paciente.\n3. `POST /consultations` → crea consulta vacía (status `in_progress`).\n4. `POST /ai/process-section` → procesa audio o texto y devuelve `{transcription, ai_suggested, suggested_text}`. Sin persistencia. Repetible N veces.\n5. `PATCH /consultation/:id/sections/:section` → autosave/blur/pause. Multipart con cualquier subset de `text`, `content`, `transcription`, `ai_suggested`, `audio`. Upsert parcial.\n6. `PATCH /consultation/:id/pause` y `/resume` para gestionar estado.\n7. `PATCH /consultation/:id/sign` cierra la consulta.\n\n## Respuesta estándar\n`{ data, meta, error }` — `error` es `null` en éxito; `{code, message, details}` en fallo.\n\n## Secciones válidas (10, en inglés)\n`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `presumptive_diagnosis`, `definitive_diagnosis`, `prescription`, `prognosis`.\n\nLa sección `chief_complaint` es la única alimentada por audio del **dueño** (no del veterinario) — su prompt evita reinterpretación médica.\n\n## Auth\nTodos los endpoints excepto `/auth/*` y `/` requieren header `Authorization: Bearer {{access_token}}`. Scripts auto-guardan el token tras login/register.",
+    "description": "API backend veterinaria — v2.\n\n## Arquitectura\nLa IA es ahora una **utilidad pura** que NO toca DB ni Storage. El cliente decide cuándo persistir los resultados vía endpoints incrementales.\n\n## Flujo recomendado\n1. `POST /auth/login` → guarda `access_token`.\n2. `POST /patients` → crea paciente.\n3. `POST /consultations` → crea consulta vacía (status `in_progress`).\n4. `POST /ai/process-section` → procesa audio o texto y devuelve `{transcription, ai_suggested, suggested_text}`. Sin persistencia. Repetible N veces.\n5. `PATCH /consultation/:id/sections/:section` → autosave/blur/pause. Multipart con cualquier subset de `text`, `content`, `transcription`, `ai_suggested`, `audio`. Upsert parcial.\n6. `PATCH /consultation/:id/pause` y `/resume` para gestionar estado.\n7. `PATCH /consultation/:id/sign` cierra la consulta.\n\n## Respuesta estándar\n`{ data, meta, error }` — `error` es `null` en éxito; `{code, message, details}` en fallo.\n\n## Secciones válidas (12, en inglés)\nAceptadas por `PATCH /consultation/:id/sections/:section` y attachments:\n\n`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`, `food`, `vitals`, `treatment`.\n\n### Con IA (9 — aceptan `POST /ai/process-section`)\n`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`.\n\n### Tap-only (3 — solo PATCH, sin IA)\n`food`, `vitals`, `treatment`. La UI escribe `content` estructurado directamente desde dropdowns / inputs numéricos; no hay audio ni LLM en estas secciones.\n\nLa sección `chief_complaint` es la única alimentada por audio del **dueño** (no del veterinario) — su prompt evita reinterpretación médica.\n\n## Auth\nTodos los endpoints excepto `/auth/*` y `/` requieren header `Authorization: Bearer {{access_token}}`. Scripts auto-guardan el token tras login/register.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -364,7 +364,7 @@
     },
     {
       "name": "AI — Process Section",
-      "description": "Utilidad pura de IA. Recibe audio o texto + sección, devuelve `{transcription, ai_suggested, suggested_text}`. **No persiste nada** — el cliente decide cuándo guardar vía `PATCH /consultation/:id/sections/:section`.\n\n## Por qué pura\nPermite regenerar el resultado N veces sin pisar ediciones manuales en DB. Doc graba → ve sugerencia → edita → solo cuando confirma se sincroniza.\n\n## Inputs\n- `audio` (file mp3/wav/m4a, máx 20MB) **o** `text_input` (string). Al menos uno.\n- `section`: una de las 10 secciones válidas.\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"section\": \"anamnesis\",\n    \"transcription\": \"texto crudo de Whisper (null si solo text_input)\",\n    \"ai_suggested\": { /* JSON estructurado, claves en inglés */ },\n    \"suggested_text\": \"texto plano renderizable con labels en español\"\n  }\n}\n```\n\n## Reglas por sección\n- `chief_complaint` → audio del DUEÑO. El prompt evita reinterpretar términos médicos.\n- Resto → audio del VETERINARIO en términos clínicos. Los prompts incluyen reglas de corrección de transcripción (vaso/bazo, omeprazol no homeprazol, etc.).",
+      "description": "Utilidad pura de IA. Recibe audio o texto + sección, devuelve `{transcription, ai_suggested, suggested_text}`. **No persiste nada** — el cliente decide cuándo guardar vía `PATCH /consultation/:id/sections/:section`.\n\n## Por qué pura\nPermite regenerar el resultado N veces sin pisar ediciones manuales en DB. Doc graba → ve sugerencia → edita → solo cuando confirma se sincroniza.\n\n## Inputs\n- `audio` (file mp3/wav/m4a, máx 20MB) **o** `text_input` (string). Al menos uno.\n- `section`: una de las **9 secciones con IA** (`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`).\n\n**No** acepta `food`, `vitals`, `treatment` (tap-only — el frontend persiste `content` directo vía PATCH).\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"section\": \"anamnesis\",\n    \"transcription\": \"texto crudo de Whisper (null si solo text_input)\",\n    \"ai_suggested\": { /* JSON estructurado, claves en inglés */ },\n    \"suggested_text\": \"texto plano renderizable con labels en español\"\n  }\n}\n```\n\n## Reglas por sección\n- `chief_complaint` → audio del DUEÑO. El prompt evita reinterpretar términos médicos.\n- Resto → audio del VETERINARIO en términos clínicos. Los prompts incluyen reglas de corrección de transcripción (vaso/bazo, omeprazol no homeprazol, etc.).",
       "item": [
         {
           "name": "Chief Complaint (owner audio)",
@@ -399,16 +399,32 @@
           }
         },
         {
-          "name": "Generic example (any section)",
+          "name": "Clinical Diagnosis (vet dictation)",
           "request": {
             "method": "POST",
-            "description": "Plantilla. Cambiar el valor de `section` para cualquiera de:\n`physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `presumptive_diagnosis`, `definitive_diagnosis`, `prescription`, `prognosis`.\n\nLas secciones esperan audio dictado por el vet o `text_input`.",
+            "description": "Procesa audio del **veterinario** dictando diagnóstico clínico. Combina presuntivo + definitivo en un solo input/sección (la UI tiene un único campo \"Diagnóstico clínico\").\n\n## Output esperado (claves EN, valores ES)\n```json\n{\n  \"presumptive_diagnosis\": \"Gastroenteritis aguda secundaria a indiscreción dietaria\",\n  \"definitive_diagnosis\": \"\"\n}\n```\n`definitive_diagnosis` queda \"\" si aún no hay confirmación por laboratorio/imagen/biopsia.\n\n## suggested_text (render plano con labels ES)\n```\nPresuntivo: Gastroenteritis aguda secundaria a indiscreción dietaria\n\nDefinitivo:\n```",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "audio", "type": "file", "src": [], "description": "Audio del vet dictando diagnóstico." },
+                { "key": "text_input", "value": "Diagnóstico presuntivo: gastroenteritis aguda por indiscreción dietaria. Aún no se confirma con laboratorio.", "type": "text" },
+                { "key": "section", "value": "clinical_diagnosis", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/ai/process-section"
+          }
+        },
+        {
+          "name": "Generic example (any AI section)",
+          "request": {
+            "method": "POST",
+            "description": "Plantilla. Cambiar el valor de `section` para cualquiera de las 9 secciones con IA:\n`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`.\n\n**No** uses `food`, `vitals`, `treatment` aquí — esas se persisten directo vía PATCH.\n\nLas secciones esperan audio dictado por el vet o `text_input` (excepto `chief_complaint` que es voz del dueño).",
             "body": {
               "mode": "formdata",
               "formdata": [
                 { "key": "audio", "type": "file", "src": [], "description": "Audio dictado por el vet." },
                 { "key": "text_input", "value": "Hemograma normal, perfil bioquímico sin alteraciones. Ecografía abdominal muestra leve gas en asas intestinales.", "type": "text" },
-                { "key": "section", "value": "complementary_exams", "type": "text", "description": "Cambiar por cualquier sección válida." }
+                { "key": "section", "value": "complementary_exams", "type": "text", "description": "Cambiar por cualquier sección con IA." }
               ]
             },
             "url": "{{base_url}}/ai/process-section"
@@ -424,19 +440,19 @@
           "name": "Get",
           "request": {
             "method": "GET",
-            "description": "Devuelve la consulta con `sections` y `attachments` embebidos.\n\n## Respuesta\n```json\n{\n  \"data\": {\n    \"id\": \"uuid\",\n    \"patient_id\": \"uuid\",\n    \"veterinarian_id\": \"uuid\",\n    \"type\": \"routine\",\n    \"status\": \"in_progress\",\n    \"result\": null,\n    \"summary\": null,\n    \"primary_diagnosis\": null,\n    \"pause_reason\": null,\n    \"pause_note\": null,\n    \"paused_at\": null,\n    \"signed_at\": null,\n    \"sections\": [ /* filas consultation_sections */ ],\n    \"attachments\": [ /* filas consultation_attachments */ ],\n    \"patient\": { /* joined */ },\n    \"created_at\": \"ISO8601\"\n  }\n}\n```",
+            "description": "Devuelve la consulta con `sections` y `attachments` embebidos (join Supabase).\n\n## Shape de la respuesta\n- Wrapper estándar `{ data, meta, error }`. `data` contiene la consulta.\n- `sections` es un array de filas crudas de `consultation_sections` (una por sección persistida — no vienen las que el doc no ha tocado).\n- En cada fila, `content` y `ai_suggested` son **JSONB de Postgres** y llegan como **objeto JSON ya parseado** (no como string). Las `key` del objeto son las mismas que el frontend envió en el PATCH.\n- Tipos numéricos como `dehydration_percent`, `temperature_c`, `tllc_seconds` se preservan como **number** si el frontend los envió como number en el JSON del PATCH.\n\n## Ejemplo real — consulta con `physical_exam` lleno tras un PATCH\n```json\n{\n  \"data\": {\n    \"id\": \"3a6f9b1c-1234-4abc-9def-0123456789ab\",\n    \"patient_id\": \"b7e1...\",\n    \"veterinarian_id\": \"a2c4...\",\n    \"type\": \"routine\",\n    \"status\": \"in_progress\",\n    \"summary\": null,\n    \"primary_diagnosis\": null,\n    \"result\": null,\n    \"pause_reason\": null,\n    \"pause_note\": null,\n    \"paused_at\": null,\n    \"signed_at\": null,\n    \"created_at\": \"2026-04-27T14:21:03.000Z\",\n    \"updated_at\": \"2026-04-27T14:33:11.000Z\",\n    \"patient\": {\n      \"id\": \"b7e1...\",\n      \"name\": \"Toby\",\n      \"species\": \"dog\",\n      \"breed\": \"Beagle\",\n      \"sex\": \"male\",\n      \"weight_kg\": 8.4,\n      \"owner_name\": \"María Pérez\"\n    },\n    \"sections\": [\n      {\n        \"id\": \"sec-uuid-1\",\n        \"consultation_id\": \"3a6f9b1c-1234-4abc-9def-0123456789ab\",\n        \"section\": \"anamnesis\",\n        \"transcription\": \"Perro macho castrado de cinco años, vacunación al día, desparasitado hace dos meses. Sin cirugías previas. Convive con un gato. Sin viajes recientes. No ha recibido tratamientos en el último mes.\",\n        \"ai_suggested\": {\n          \"previous_illnesses\": \"\",\n          \"sterilized\": \"Sí (castrado)\",\n          \"lives_with_other_animals\": \"Sí, convive con un gato\",\n          \"number_of_births\": \"\",\n          \"previous_surgeries\": \"\",\n          \"vaccination\": \"Al día\",\n          \"recent_treatments\": \"Ninguno en el último mes\",\n          \"recent_travel\": \"\",\n          \"deworming\": \"Hace 2 meses\"\n        },\n        \"text\": \"Esterilizado: Sí (castrado)\\nConvive con otros animales: Sí, convive con un gato\\nVacunación: Al día\\nTratamientos recientes: Ninguno en el último mes\\nDesparasitación: Hace 2 meses\",\n        \"content\": {\n          \"previous_illnesses\": \"\",\n          \"sterilized\": \"Sí (castrado)\",\n          \"lives_with_other_animals\": \"Sí, convive con un gato\",\n          \"number_of_births\": \"\",\n          \"previous_surgeries\": \"\",\n          \"vaccination\": \"Al día\",\n          \"recent_treatments\": \"Ninguno en el último mes\",\n          \"recent_travel\": \"\",\n          \"deworming\": \"Hace 2 meses\"\n        },\n        \"audio_url\": \"consultations-audio/3a6f9b1c.../anamnesis-1714233000.m4a\",\n        \"processed_at\": \"2026-04-27T14:30:14.000Z\",\n        \"created_at\": \"2026-04-27T14:29:55.000Z\",\n        \"updated_at\": \"2026-04-27T14:30:14.000Z\"\n      },\n      {\n        \"id\": \"sec-uuid-2\",\n        \"consultation_id\": \"3a6f9b1c-1234-4abc-9def-0123456789ab\",\n        \"section\": \"physical_exam\",\n        \"transcription\": \"Mucosas rosadas, hidratación normal, condición corporal cinco sobre nueve...\",\n        \"ai_suggested\": {\n          \"skin_and_coat\": \"Sin alteraciones\",\n          \"respiratory_system\": \"Auscultación normal\",\n          \"gastrointestinal_system\": \"Leve distensión a la palpación\",\n          \"genitourinary_system\": \"\",\n          \"cardiovascular_system\": \"\",\n          \"reproductive_system\": \"\",\n          \"musculoskeletal_system\": \"\",\n          \"nervous_system\": \"\",\n          \"ophthalmological_system\": \"\",\n          \"otic_system\": \"\",\n          \"lymph_nodes\": \"\",\n          \"oral_cavity\": \"\",\n          \"other\": \"\"\n        },\n        \"text\": \"Mucosas rosadas. BCS 5/9. GI: leve distensión. Resto sin hallazgos.\",\n        \"content\": {\n          \"mucosa\": \"pink\",\n          \"dehydration_percent\": 5,\n          \"bcs\": \"5/9\",\n          \"attitude_owner\": \"friendly\",\n          \"attitude_vet\": \"docile\",\n          \"pulse\": \"normal\",\n          \"tllc_seconds\": 2,\n          \"trcp_seconds\": 2,\n          \"systems_affected\": \"Sistema gastrointestinal: leve distensión abdominal a la palpación. Resto sin alteraciones.\"\n        },\n        \"audio_url\": \"consultations-audio/3a6f9b1c.../physical_exam-1714233066.m4a\",\n        \"processed_at\": \"2026-04-27T14:33:11.000Z\",\n        \"created_at\": \"2026-04-27T14:32:50.000Z\",\n        \"updated_at\": \"2026-04-27T14:33:11.000Z\"\n      },\n      {\n        \"id\": \"sec-uuid-3\",\n        \"consultation_id\": \"3a6f9b1c-1234-4abc-9def-0123456789ab\",\n        \"section\": \"vitals\",\n        \"transcription\": null,\n        \"ai_suggested\": {},\n        \"text\": null,\n        \"content\": {\n          \"temperature_c\": 38.6,\n          \"heart_rate_bpm\": 110,\n          \"respiratory_rate_rpm\": 24,\n          \"weight_kg\": 8.4\n        },\n        \"audio_url\": null,\n        \"processed_at\": \"2026-04-27T14:25:02.000Z\",\n        \"created_at\": \"2026-04-27T14:25:02.000Z\",\n        \"updated_at\": \"2026-04-27T14:25:02.000Z\"\n      }\n    ],\n    \"attachments\": []\n  },\n  \"meta\": null,\n  \"error\": null\n}\n```\n\n## Notas para el cliente\n- **El campo se llama exactamente `content`** (no `content_json`, `data` ni `payload`). Mismo nombre en DB, en el body del PATCH y en la respuesta.\n- **`content` y `ai_suggested` llegan como objetos JSON parseados**. Postgres los guarda como `JSONB` y `@supabase/supabase-js` los devuelve ya deserializados — el cliente NO debe hacer `jsonDecode` sobre ellos.\n- **Los números van como `number`** si el frontend los envía así dentro del JSON del PATCH (`{\"dehydration_percent\": 5}` → vuelve `5`; `7.5` → `7.5`). El backend no coacciona tipos: si el frontend manda `\"5\"` como string, vuelve string. **Siempre enviar numéricos como number.**\n- Las secciones que el doc no ha tocado **no aparecen** en `sections` (nunca se insertó la fila). El cliente debe tratar la ausencia como \"vacía\".",
             "url": "{{base_url}}/consultation/{{consultation_id}}"
           }
         },
         {
-          "name": "Sync Section (autosave / blur / pause)",
+          "name": "Sync Section — Anamnesis (text autosave)",
           "request": {
             "method": "PATCH",
-            "description": "Persiste el estado actual de una sección. Multipart form-data. **Upsert parcial**: solo escribe los campos provistos. Si la fila no existe, se crea.\n\n## Path params\n- `:id` — consultation_id\n- `:section` — una de las 10 secciones EN\n\n## Form-data (todos opcionales, al menos uno requerido)\n| Campo | Tipo | Notas |\n|---|---|---|\n| `text` | string | texto editable que ve el doctor |\n| `content` | JSON string | estructura paralela a `ai_suggested` (post-edición) |\n| `transcription` | string | transcripción cruda del audio |\n| `ai_suggested` | JSON string | salida del LLM (audit trail) |\n| `audio` | file | si viene, se sube a Storage y se guarda como `audio_url` |\n\n## Cuándo usar\n- **Autosave (debounce ~2s tras edición manual)**: solo `text`.\n- **Blur (cambio de sección)**: `text` + `transcription` + `ai_suggested` + `audio` si hay datos IA nuevos no sincronizados.\n- **Pause**: forzar sync del último estado antes de cambiar status.",
+            "description": "Persiste el estado actual de una sección. Multipart form-data. **Upsert parcial**: solo escribe los campos provistos. Si la fila no existe, se crea.\n\n## Path params\n- `:id` — consultation_id\n- `:section` — una de las **12 secciones EN**: `chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`, `food`, `vitals`, `treatment`.\n\n## Form-data (todos opcionales, al menos uno requerido)\n| Campo | Tipo | Notas |\n|---|---|---|\n| `text` | string | texto editable que ve el doctor |\n| `content` | JSON string | estructura post-edición (ver shape por sección abajo y en los ejemplos siguientes) |\n| `transcription` | string | transcripción cruda del audio |\n| `ai_suggested` | JSON string | salida cruda del LLM (audit trail) |\n| `audio` | file | si viene, se sube a Storage y se guarda como `audio_url` |\n\n## Cuándo usar\n- **Autosave (debounce ~2s tras edición manual)**: solo `text`.\n- **Blur (cambio de sección)**: `text` + `transcription` + `ai_suggested` + `audio` si hay datos IA nuevos no sincronizados.\n- **Pause**: forzar sync del último estado antes de cambiar status.\n- **Tap-only (`food`, `vitals`, `treatment`)**: solo `content` con la forma estructurada (ver ejemplos dedicados).\n\nEste ejemplo cubre el caso más común: autosave de texto editado en Anamnesis.",
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "text", "value": "Texto editado por el doctor", "type": "text" },
+                { "key": "text", "value": "Perro macho castrado de 5 años, vacunación al día, desparasitado hace 2 meses.", "type": "text" },
                 { "key": "content", "value": "", "type": "text", "disabled": true, "description": "JSON string opcional" },
                 { "key": "transcription", "value": "", "type": "text", "disabled": true, "description": "Solo si se está sincronizando una corrida IA" },
                 { "key": "ai_suggested", "value": "", "type": "text", "disabled": true, "description": "JSON string del output del LLM" },
@@ -444,6 +460,84 @@
               ]
             },
             "url": "{{base_url}}/consultation/{{consultation_id}}/sections/anamnesis"
+          }
+        },
+        {
+          "name": "Sync Section — Physical Exam (mixed form + AI)",
+          "request": {
+            "method": "PATCH",
+            "description": "Persiste `physical_exam` con la combinación de **8 inputs manuales** del frontend (dropdowns + numéricos) + **1 campo de texto editado** que vino del prompt de IA.\n\nLa IA sigue dictando los sistemas (skin_and_coat, respiratory_system, …) pero el frontend los aplana a un único string editable `systems_affected` antes de hacer PATCH.\n\n## Shape de `content` (lo que envía el frontend)\n```json\n{\n  \"mucosa\": \"pink|pale|jaundiced|cyanotic|congested\",\n  \"dehydration_percent\": 0,\n  \"bcs\": \"1/9..9/9\",\n  \"attitude_owner\": \"friendly|docile|fearful|indifferent|aggressive\",\n  \"attitude_vet\":   \"friendly|docile|fearful|indifferent|aggressive\",\n  \"pulse\": \"weak|normal|strong|filiform|absent\",\n  \"tllc_seconds\": 0,\n  \"trcp_seconds\": 0,\n  \"systems_affected\": \"string libre (post-edición del doc sobre lo que sugirió la IA)\"\n}\n```\n\n- 8 claves manuales: `mucosa`, `dehydration_percent`, `bcs`, `attitude_owner`, `attitude_vet`, `pulse`, `tllc_seconds`, `trcp_seconds`. La IA NO las infiere.\n- 1 clave editable post-IA: `systems_affected` — texto plano que combina los hallazgos por sistema dictados.\n\n`text` puede repetir el render del doctor o quedar vacío (la UI puede usar solo `content`).",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "content", "value": "{\n  \"mucosa\": \"pink\",\n  \"dehydration_percent\": 5,\n  \"bcs\": \"5/9\",\n  \"attitude_owner\": \"friendly\",\n  \"attitude_vet\": \"docile\",\n  \"pulse\": \"normal\",\n  \"tllc_seconds\": 2,\n  \"trcp_seconds\": 2,\n  \"systems_affected\": \"Sistema gastrointestinal: leve distensión abdominal a la palpación. Resto sin alteraciones.\"\n}", "type": "text" },
+                { "key": "text", "value": "", "type": "text", "disabled": true },
+                { "key": "transcription", "value": "", "type": "text", "disabled": true },
+                { "key": "ai_suggested", "value": "", "type": "text", "disabled": true },
+                { "key": "audio", "type": "file", "src": [], "disabled": true }
+              ]
+            },
+            "url": "{{base_url}}/consultation/{{consultation_id}}/sections/physical_exam"
+          }
+        },
+        {
+          "name": "Sync Section — Clinical Diagnosis",
+          "request": {
+            "method": "PATCH",
+            "description": "Persiste el diagnóstico clínico (presuntivo + definitivo en un solo registro). Sustituye los antiguos `presumptive_diagnosis` y `definitive_diagnosis`.\n\n## Shape de `content` / `ai_suggested`\n```json\n{\n  \"presumptive_diagnosis\": \"string\",\n  \"definitive_diagnosis\": \"string\"\n}\n```\n\n`definitive_diagnosis` puede ir vacío si aún no hay confirmación.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "content", "value": "{\n  \"presumptive_diagnosis\": \"Gastroenteritis aguda por indiscreción dietaria\",\n  \"definitive_diagnosis\": \"\"\n}", "type": "text" },
+                { "key": "text", "value": "Presuntivo: Gastroenteritis aguda por indiscreción dietaria\n\nDefinitivo:", "type": "text" },
+                { "key": "transcription", "value": "", "type": "text", "disabled": true },
+                { "key": "ai_suggested", "value": "", "type": "text", "disabled": true },
+                { "key": "audio", "type": "file", "src": [], "disabled": true }
+              ]
+            },
+            "url": "{{base_url}}/consultation/{{consultation_id}}/sections/clinical_diagnosis"
+          }
+        },
+        {
+          "name": "Sync Section — Food (tap-only, no AI)",
+          "request": {
+            "method": "PATCH",
+            "description": "Sección **tap-only**: el frontend envía `content` directo desde un dropdown. **No** acepta audio ni pasa por `/ai/process-section`.\n\n## Shape de `content`\n```json\n{ \"regime\": \"concentrate|barf|homemade|mixed|other\" }\n```",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "content", "value": "{ \"regime\": \"concentrate\" }", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/consultation/{{consultation_id}}/sections/food"
+          }
+        },
+        {
+          "name": "Sync Section — Vitals (tap-only, no AI)",
+          "request": {
+            "method": "PATCH",
+            "description": "Sección **tap-only**: el frontend envía `content` directo desde inputs numéricos. **No** acepta audio ni pasa por `/ai/process-section`.\n\n## Shape de `content`\n```json\n{\n  \"temperature_c\": 0,\n  \"heart_rate_bpm\": 0,\n  \"respiratory_rate_rpm\": 0,\n  \"weight_kg\": 0\n}\n```",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "content", "value": "{\n  \"temperature_c\": 38.6,\n  \"heart_rate_bpm\": 110,\n  \"respiratory_rate_rpm\": 24,\n  \"weight_kg\": 8.4\n}", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/consultation/{{consultation_id}}/sections/vitals"
+          }
+        },
+        {
+          "name": "Sync Section — Treatment (tap-only, no AI)",
+          "request": {
+            "method": "PATCH",
+            "description": "Sección **tap-only**: el frontend envía `content` directo desde un dropdown. **No** acepta audio ni pasa por `/ai/process-section`.\n\n## Shape de `content`\n```json\n{ \"modality\": \"ambulatory|hospitalization\" }\n```",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "content", "value": "{ \"modality\": \"ambulatory\" }", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/consultation/{{consultation_id}}/sections/treatment"
           }
         },
         {
@@ -499,12 +593,12 @@
           ],
           "request": {
             "method": "POST",
-            "description": "Sube adjunto a la consulta. Guarda `attachment_id` en collection var.\n\n## Form-data\n| Campo | Tipo | Requerido | Notas |\n|---|---|---|---|\n| `file` | file | sí | cualquier archivo (pdf, img). Sube a Supabase Storage |\n| `section` | text (enum) | no | una de las 10 secciones EN |\n| `label` | text | no | descripción corta |",
+            "description": "Sube adjunto a la consulta. Guarda `attachment_id` en collection var.\n\n## Form-data\n| Campo | Tipo | Requerido | Notas |\n|---|---|---|---|\n| `file` | file | sí | cualquier archivo (pdf, img). Sube a Supabase Storage |\n| `section` | text (enum) | no | una de las 12 secciones EN |\n| `label` | text | no | descripción corta |",
             "body": {
               "mode": "formdata",
               "formdata": [
                 { "key": "file", "type": "file", "src": [] },
-                { "key": "section", "value": "complementary_exams", "type": "text", "description": "chief_complaint | anamnesis | physical_exam | problems | diagnostic_approach | complementary_exams | presumptive_diagnosis | definitive_diagnosis | prescription | prognosis" },
+                { "key": "section", "value": "complementary_exams", "type": "text", "description": "chief_complaint | anamnesis | physical_exam | problems | diagnostic_approach | complementary_exams | clinical_diagnosis | prescription | prognosis | food | vitals | treatment" },
                 { "key": "label", "value": "Hemograma PDF", "type": "text" }
               ]
             },

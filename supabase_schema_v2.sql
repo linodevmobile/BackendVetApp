@@ -38,10 +38,12 @@ CREATE TYPE clinical_section AS ENUM (
   'problems',
   'diagnostic_approach',
   'complementary_exams',
-  'presumptive_diagnosis',
-  'definitive_diagnosis',
+  'clinical_diagnosis',
   'prescription',
-  'prognosis'
+  'prognosis',
+  'food',
+  'vitals',
+  'treatment'
 );
 
 CREATE TYPE appointment_status AS ENUM ('scheduled', 'now', 'completed', 'cancelled');

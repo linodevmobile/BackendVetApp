@@ -1,5 +1,5 @@
 const { transcribeAudio } = require('../services/transcriptionService');
-const { getPrompt, isValidSection, VALID_SECTIONS } = require('../services/promptRouter');
+const { getPrompt, isAiSection, AI_SECTIONS } = require('../services/promptRouter');
 const { processWithLLM } = require('../services/llmService');
 const { deleteLocalFile } = require('../services/storageService');
 const { flattenAiToText } = require('../utils/flattenAiToText');
@@ -15,9 +15,9 @@ async function processSection(req, res, next) {
   try {
     const { section, text_input } = req.body;
 
-    if (!isValidSection(section)) {
+    if (!isAiSection(section)) {
       throw AppError.validation(
-        `Sección inválida. Válidas: ${VALID_SECTIONS.join(', ')}`
+        `Sección inválida para IA. Válidas: ${AI_SECTIONS.join(', ')}`
       );
     }
     if (!file && !text_input) {
