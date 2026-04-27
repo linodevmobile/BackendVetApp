@@ -81,7 +81,9 @@ curl -X PATCH http://localhost:3000/consultation/<consultation_id>/sections/anam
 2. Guardar — `npm run dev` auto-reinicia.
 3. Probar vía Postman/curl contra `POST /ai/process-section`.
 
-Los 10 prompts viven en español (instrucciones al LLM); claves JSON en inglés (identificadores). El bloque común de corrección de transcripción vive en `src/prompts/_shared/transcriptionRules.js` y se importa por concatenación. La sección `chief_complaint` NO incluye este bloque (su voz es la del dueño, no del veterinario).
+Los 9 prompts viven en español (instrucciones al LLM); claves JSON en inglés (identificadores). El bloque común de corrección de transcripción vive en `src/prompts/_shared/transcriptionRules.js` y se importa por concatenación. La sección `chief_complaint` NO incluye este bloque (su voz es la del dueño, no del veterinario).
+
+Las secciones `food`, `vitals` y `treatment` son **tap-only** y no tienen prompt — el frontend escribe `content` estructurado directo vía PATCH (dropdowns / inputs numéricos).
 
 Para cambiar los labels que ve el doctor (español), editar `src/utils/sectionLabels.js`.
 
@@ -89,13 +91,19 @@ Para cambiar los labels que ve el doctor (español), editar `src/utils/sectionLa
 
 ## 4. Agregar una sección clínica nueva
 
+### Sección con IA
 1. Crear `src/prompts/miNuevaSeccionPrompt.js` (importar `_shared/transcriptionRules` si aplica).
-2. Registrar en `src/services/promptRouter.js` con la clave exacta del enum.
+2. Registrar el prompt en `PROMPTS` dentro de `src/services/promptRouter.js` con la clave exacta del enum (queda automáticamente en `AI_SECTIONS` y `VALID_SECTIONS`).
 3. Agregar el valor al enum `clinical_section`:
    ```sql
    ALTER TYPE clinical_section ADD VALUE 'mi_nueva_seccion';
    ```
 4. Agregar el diccionario de labels ES en `src/utils/sectionLabels.js` para que la UI muestre el JSON con etiquetas en español.
+
+### Sección tap-only (sin IA)
+1. Agregar el valor al enum `clinical_section` (mismo `ALTER TYPE`).
+2. Agregar la clave a `TAP_ONLY_SECTIONS` en `src/services/promptRouter.js` — entra a `VALID_SECTIONS` (PATCH la acepta) pero NO a `AI_SECTIONS` (queda rechazada por `/ai/process-section`).
+3. Documentar el shape del `content` en Postman (no hay flatten porque no hay IA).
 
 La tabla `consultation_sections` ya guarda cualquier sección válida sin cambios adicionales.
 
@@ -183,7 +191,7 @@ src/
 ├── controllers/      # auth, veterinarian, patient, consultation, ai, appointment, dashboard, attachment, alert
 ├── repositories/     # patientsRepo, consultationsRepo, sectionsRepo, appointmentsRepo, favoritesRepo, alertsRepo, attachmentsRepo
 ├── services/         # llmService, promptRouter, transcriptionService, storageService
-├── prompts/          # 10 prompts clínicos + _shared/transcriptionRules.js
+├── prompts/          # 9 prompts clínicos (secciones con IA) + _shared/transcriptionRules.js
 ├── routes/           # authRoutes, patientRoutes, consultationRoutes, consultationsCollectionRoutes, aiRoutes, appointmentRoutes, veterinarianRoutes, alertRoutes
 ├── utils/            # AppError, logger, safeJsonParse, flattenAiToText, sectionLabels, salutation
 ├── app.js

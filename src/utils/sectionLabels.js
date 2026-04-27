@@ -47,12 +47,9 @@ const SECTION_LABELS = {
     other_exams: 'Otros exámenes',
     general_interpretation: 'Interpretación general',
   },
-  presumptive_diagnosis: {
-    presumptive_diagnosis: 'Diagnóstico presuntivo',
-  },
-  definitive_diagnosis: {
-    definitive_diagnosis: 'Diagnóstico definitivo',
-    confirmatory_findings: 'Hallazgos confirmatorios',
+  clinical_diagnosis: {
+    presumptive_diagnosis: 'Presuntivo',
+    definitive_diagnosis: 'Definitivo',
   },
   prescription: {
     prescription: 'Receta',

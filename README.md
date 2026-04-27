@@ -49,7 +49,7 @@ PORT=3000
 Ejecutar `supabase_schema_v2.sql` en el SQL Editor de Supabase. **Nota**: el script ejecuta `DROP SCHEMA public CASCADE` — solo aplicar en dev/fresh project.
 
 Define:
-- Enums: `consultation_type`, `consultation_status`, `consultation_result`, `consultation_pause_reason`, `clinical_section` (10 valores en inglés), `appointment_status`, `alert_severity`, `patient_species`, `patient_sex`
+- Enums: `consultation_type`, `consultation_status`, `consultation_result`, `consultation_pause_reason`, `clinical_section` (12 valores en inglés), `appointment_status`, `alert_severity`, `patient_species`, `patient_sex`
 - Tablas: `veterinarians`, `patients`, `patient_alerts`, `vet_favorite_patients`, `consultations`, `consultation_sections` (modelo híbrido), `consultation_attachments`, `appointments` + tablas Fase 2 hospitalización
 - RLS authenticated por vet
 - Buckets `consultations-audio` y `consultation-attachments`
@@ -134,11 +134,36 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 - `GET /consultation/:id/attachments`
 - `DELETE /consultation/:id/attachments/:attachmentId`
 
-## Secciones clínicas (10)
+## Secciones clínicas (12)
 
-`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `presumptive_diagnosis`, `definitive_diagnosis`, `prescription`, `prognosis`.
+Enum `clinical_section`, dividido en dos grupos según si pasan o no por la utilidad IA:
 
-Cada sección tiene un prompt en `src/prompts/`. Los identificadores de routing son inglés; los labels visibles al doctor (español) viven en `src/utils/sectionLabels.js`. La sección `chief_complaint` es la única alimentada por audio del **dueño** (no del veterinario) — su prompt evita reinterpretación médica.
+### Con IA (9 — aceptan `POST /ai/process-section`)
+`chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`.
+
+### Tap-only (3 — solo `PATCH`, sin IA)
+`food`, `vitals`, `treatment`. La UI escribe `content` estructurado directamente (dropdowns / inputs numéricos); no hay prompt ni audio.
+
+`clinical_diagnosis` reemplaza a las antiguas `presumptive_diagnosis` y `definitive_diagnosis` — es una sola sección cuyo `content`/`ai_suggested` tiene la forma `{ presumptive_diagnosis, definitive_diagnosis }`.
+
+Cada sección con IA tiene un prompt en `src/prompts/`. Los identificadores de routing son inglés; los labels visibles al doctor (español) viven en `src/utils/sectionLabels.js`. La sección `chief_complaint` es la única alimentada por audio del **dueño** (no del veterinario) — su prompt evita reinterpretación médica.
+
+### Shape de `content` por sección (lo que el frontend envía en el PATCH)
+
+| Sección | Shape de `content` |
+|---|---|
+| `chief_complaint` | `{ main_complaint: string }` |
+| `anamnesis` | claves de anamnesis (`previous_illnesses`, `vaccination`, …) |
+| `physical_exam` | 8 campos manuales (`mucosa`, `dehydration_percent`, `bcs`, `attitude_owner`, `attitude_vet`, `pulse`, `tllc_seconds`, `trcp_seconds`) + `systems_affected` (texto editable derivado de la IA) — ver Postman |
+| `problems` | claves de problems |
+| `diagnostic_approach` | claves de diagnostic_approach |
+| `complementary_exams` | claves de complementary_exams |
+| `clinical_diagnosis` | `{ presumptive_diagnosis: string, definitive_diagnosis: string }` |
+| `prescription` | `{ prescription: string }` |
+| `prognosis` | `{ prognosis: string, evolution: string }` |
+| `food` | `{ regime: 'concentrate'\|'barf'\|'homemade'\|'mixed'\|'other' }` |
+| `vitals` | `{ temperature_c, heart_rate_bpm, respiratory_rate_rpm, weight_kg }` (numbers) |
+| `treatment` | `{ modality: 'ambulatory'\|'hospitalization' }` |
 
 ## Modelo de datos `consultation_sections`
 
@@ -163,7 +188,7 @@ src/
 ├── controllers/    # orquestación (incluye aiController y consultationController)
 ├── repositories/   # acceso a tablas Supabase
 ├── services/       # llmService, promptRouter, transcriptionService, storageService
-├── prompts/        # 10 prompts clínicos + _shared/transcriptionRules.js
+├── prompts/        # 9 prompts clínicos (secciones con IA) + _shared/transcriptionRules.js
 ├── routes/         # Express routers
 ├── utils/          # AppError, logger, safeJsonParse, flattenAiToText, sectionLabels, salutation
 ├── app.js
@@ -176,3 +201,8 @@ Render auto-despliega desde la rama configurada. Antes del primer deploy contra 
 1. Completar `SUPABASE_SERVICE_ROLE_KEY` en Environment.
 2. Ejecutar `supabase_schema_v2.sql` en Supabase (o aplicar migraciones incrementales si ya hay datos).
 3. Verificar buckets creados.
+
+## Migraciones incrementales
+
+Para DBs existentes que no se pueden resetear, hay scripts en `migrations/`:
+- `migrations/v2.2_sections.sql` — actualiza el enum `clinical_section`: elimina `presumptive_diagnosis`/`definitive_diagnosis`, agrega `clinical_diagnosis`, `food`, `vitals`, `treatment`. Migra filas existentes (merge automático cuando un mismo consultation tiene presuntivo + definitivo). Idempotente: aborta si ya se aplicó.

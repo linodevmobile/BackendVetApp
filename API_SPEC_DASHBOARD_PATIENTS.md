@@ -4,7 +4,7 @@
 >
 > - `vet_favorite_patients` usa `vet_id` (no `veterinarian_id`).
 > - `patients` ya tiene `owner_address` (no listado abajo).
-> - Las secciones clínicas migraron a inglés: `chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `presumptive_diagnosis`, `definitive_diagnosis`, `prescription`, `prognosis`.
+> - Las secciones clínicas migraron a inglés y crecieron a 12 (`v2.2`): con IA — `chief_complaint`, `anamnesis`, `physical_exam`, `problems`, `diagnostic_approach`, `complementary_exams`, `clinical_diagnosis`, `prescription`, `prognosis`. Tap-only (sin IA) — `food`, `vitals`, `treatment`. `clinical_diagnosis` reemplazó a `presumptive_diagnosis` + `definitive_diagnosis`.
 > - El endpoint `POST /consultation/process` fue eliminado y reemplazado por: `POST /ai/process-section` (utilidad pura IA, sin DB) + `POST /consultations` (crear) + `PATCH /consultation/:id/sections/:section` (autosave/blur/pause).
 
 Documento de handoff al backend con los **endpoints requeridos** y los **gaps de schema** detectados tras implementar las pantallas de Dashboard y Pacientes en el cliente Flutter.
