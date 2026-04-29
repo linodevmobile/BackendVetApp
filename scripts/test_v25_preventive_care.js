@@ -129,6 +129,36 @@ async function http(method, path, token, body) {
       assert(rabies.applied === true, 'plan flags antirrábica as already applied');
     }
 
+    // === POST apply-next (deworming_external) — kind filter, garantiza que hay item pendiente ===
+    // Borramos primero el deworming_external que sembramos para que apply-next lo encuentre pendiente.
+    await admin.from('patient_preventive_care').delete().eq('id', id2);
+    const idx = created.indexOf(id2);
+    if (idx >= 0) created.splice(idx, 1);
+
+    const applyExt = await http('POST', `/patients/${PATIENT_ID}/preventive-care/apply-next`, token, {
+      kind: 'deworming_external',
+    });
+    assert(applyExt.status === 201, `apply-next ext 201 (got ${applyExt.status} ${JSON.stringify(applyExt.body)})`);
+    assert(applyExt.body.data.kind === 'deworming_external', 'apply-next ext kind correct');
+    assert(applyExt.body.data.mode === 'plan', 'apply-next ext mode = plan');
+    const todayCheck = new Date().toISOString().slice(0, 10);
+    assert(applyExt.body.data.applied_at === todayCheck, 'apply-next ext applied_at = today');
+    assert(applyExt.body.data.applied_by_vet_id, 'apply-next ext applied_by_vet_id set');
+    assert(applyExt.body.data.source_item, 'apply-next ext returns source_item meta');
+    created.push(applyExt.body.data.id);
+
+    // === POST apply-next sin filtro — debería traer próximo core pendiente (probablemente vaccination) ===
+    // Borramos también la vacuna sembrada para liberar Antirrábica como "no aplicada".
+    await admin.from('patient_preventive_care').delete().eq('id', id1);
+    const idx2 = created.indexOf(id1);
+    if (idx2 >= 0) created.splice(idx2, 1);
+
+    const applyAny = await http('POST', `/patients/${PATIENT_ID}/preventive-care/apply-next`, token, {});
+    assert(applyAny.status === 201, `apply-next any 201 (got ${applyAny.status} ${JSON.stringify(applyAny.body)})`);
+    assert(['vaccination', 'deworming_internal', 'deworming_external'].includes(applyAny.body.data.kind), 'apply-next any returned a valid kind');
+    assert(applyAny.body.data.mode === 'plan', 'apply-next any mode = plan');
+    created.push(applyAny.body.data.id);
+
     console.log('\nALL v2.5 CHECKS PASSED');
   } finally {
     if (created.length) {

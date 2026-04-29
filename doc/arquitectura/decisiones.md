@@ -15,6 +15,26 @@ Bitácora cronológica de decisiones arquitectónicas significativas. Formato co
 
 ---
 
+## 2026-04-29 · `apply-next` resuelto en backend (no cliente)
+
+**Decisión**: agregar `POST /patients/:id/preventive-care/apply-next`. El backend toma decisión sobre qué ítem del plan aplicar, en vez de que el cliente lea `suggested-plan`, encuentre el siguiente y haga POST manual.
+
+**Contexto**: el botón "Aplicar siguiente del plan" del mockup (tab Salud → Vacunas → modo plan) es un click único. El cliente podría componerlo con 2 requests (`GET suggested-plan` + `POST preventive-care`), pero esa lógica (priorización core > optional, cálculo de `next_due_at` desde el catálogo) duplica responsabilidad backend y obliga a cada cliente (Flutter ahora, web futura) a reimplementarla.
+
+**Alternativas descartadas**:
+- **Resolver en cliente**: cada cliente reimplementa la fórmula de proyección y la priorización, fuera del lugar donde se puede testear como unidad.
+
+**Consecuencias**:
+- Endpoint nuevo `POST /patients/:id/preventive-care/apply-next` con body opcional `{ kind? }`.
+- Prioriza `core` antes que `optional`. Filtro `kind` (`vaccination` / `deworming_internal` / `deworming_external`) opcional.
+- Respuesta = fila creada + `source_item` con metadata del catálogo (`code`, `group`, `name`) para mostrar contexto sin re-fetch del plan.
+- Errores: `404` si la especie no tiene plan; `409` si el plan está completo.
+- Flujo **manual** no cambia: `POST /preventive-care` sigue libre, no proviene del catálogo.
+
+**Estado**: vigente.
+
+---
+
 ## 2026-04-29 · `patient_preventive_care` unificada (vacunas + desparasitaciones)
 
 **Decisión**: una sola tabla `patient_preventive_care` con enum `preventive_care_kind` (`vaccination` / `deworming_internal` / `deworming_external`), en vez de dos tablas separadas (`patient_vaccinations` + `patient_dewormings`).

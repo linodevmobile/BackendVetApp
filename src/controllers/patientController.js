@@ -196,6 +196,27 @@ async function suggestedPreventiveCarePlan(req, res, next) {
   }
 }
 
+async function applyNextPreventiveCare(req, res, next) {
+  try {
+    const patient = await patientsRepo.getById(req.supabase, req.veterinarianId, req.params.id);
+    if (!patient) throw AppError.notFound('Paciente no encontrado');
+
+    const result = await preventiveCareRepo.applyNext(
+      req.supabase,
+      req.veterinarianId,
+      req.params.id,
+      { kind: req.body?.kind },
+    );
+
+    if (result.error === 'no_plan') throw AppError.notFound(result.message);
+    if (result.error === 'plan_complete') throw AppError.conflict(result.message);
+
+    return res.ok({ ...result.row, source_item: result.source_item }, null, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   create, getById, list, update,
   addFavorite, removeFavorite, listFavorites,
@@ -208,4 +229,5 @@ module.exports = {
   createPreventiveCare,
   updatePreventiveCare,
   suggestedPreventiveCarePlan,
+  applyNextPreventiveCare,
 };
