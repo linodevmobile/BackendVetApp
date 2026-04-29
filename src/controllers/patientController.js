@@ -3,6 +3,7 @@ const favoritesRepo = require('../repositories/favoritesRepo');
 const hospitalizationsRepo = require('../repositories/hospitalizationsRepo');
 const appointmentsRepo = require('../repositories/appointmentsRepo');
 const attachmentsRepo = require('../repositories/attachmentsRepo');
+const preventiveCareRepo = require('../repositories/preventiveCareRepo');
 const { uploadAttachment, deleteLocalFile } = require('../services/storageService');
 const AppError = require('../utils/AppError');
 
@@ -147,6 +148,54 @@ async function uploadAttachmentForPatient(req, res, next) {
   }
 }
 
+async function listPreventiveCare(req, res, next) {
+  try {
+    const { kind, upcoming, days, limit, offset } = req.query;
+    const result = await preventiveCareRepo.listByPatient(req.supabase, req.params.id, {
+      kind, upcoming, days, limit, offset,
+    });
+    return res.ok(result.items, { total: result.total, limit, offset, kind: kind || null, upcoming: !!upcoming });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function createPreventiveCare(req, res, next) {
+  try {
+    const patient = await patientsRepo.getById(req.supabase, req.veterinarianId, req.params.id);
+    if (!patient) throw AppError.notFound('Paciente no encontrado');
+    const row = await preventiveCareRepo.create(req.supabase, req.veterinarianId, req.params.id, req.body);
+    return res.ok(row, null, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updatePreventiveCare(req, res, next) {
+  try {
+    const row = await preventiveCareRepo.update(
+      req.supabase,
+      req.veterinarianId,
+      req.params.event_id,
+      req.params.id,
+      req.body,
+    );
+    return res.ok(row);
+  } catch (err) {
+    if (err.code === 'PGRST116') return next(AppError.notFound('Evento no encontrado'));
+    next(err);
+  }
+}
+
+async function suggestedPreventiveCarePlan(req, res, next) {
+  try {
+    const plan = await preventiveCareRepo.suggestedPlan(req.supabase, req.params.id);
+    return res.ok(plan);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   create, getById, list, update,
   addFavorite, removeFavorite, listFavorites,
@@ -155,4 +204,8 @@ module.exports = {
   listAppointments,
   listAttachments,
   uploadAttachmentForPatient,
+  listPreventiveCare,
+  createPreventiveCare,
+  updatePreventiveCare,
+  suggestedPreventiveCarePlan,
 };

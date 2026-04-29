@@ -1,4 +1,4 @@
-> Última actualización: 2026-04-29 · Schema: v2.3
+> Última actualización: 2026-04-29 · Schema: v2.5
 
 # 11 — Endpoints (resumen)
 
@@ -42,6 +42,14 @@ Este apartado lista las rutas existentes con su propósito, body/query principal
 | PATCH | `/patients/:id` | body parcial (sin `weight_kg`) | Actualiza paciente |
 | GET | `/patients/:id/timeline` | `?type=all\|consultation\|attachment&limit&offset` | Timeline cronológico para tab Historia |
 | GET | `/patients/:id/measurements` | `?metric=weight_kg\|temperature_c\|...&limit&offset` | Histórico para gráficas |
+| GET | `/patients/:id/hospitalizations` | `?limit&offset` | Hospitalizaciones del paciente |
+| GET | `/patients/:id/appointments` | `?upcoming&limit&offset` | Citas del paciente |
+| GET | `/patients/:id/attachments` | `?category&limit&offset` | Adjuntos a nivel paciente |
+| POST | `/patients/:id/attachments` | multipart: `file`, `category`, `label?` | Sube adjunto a nivel paciente |
+| GET | `/patients/:id/preventive-care` | `?kind&upcoming&days&limit&offset` | Vacunas + desparasitaciones. `status` derivado: `ok\|soon\|overdue\|pending\|applied` |
+| POST | `/patients/:id/preventive-care` | `{ kind, name, product?, applied_at?, next_due_at?, mode?, consultation_id?, notes? }` | Registra evento (debe traer `applied_at` o `next_due_at`) |
+| PATCH | `/patients/:id/preventive-care/:event_id` | body parcial | Actualiza evento (re-programar, marcar aplicada) |
+| GET | `/patients/:id/preventive-care/suggested-plan` | — | Plan WSAVA + regional CO según species + life_stage, cruzado con historial |
 | GET | `/patients/favorites` | — | Pacientes favoritos del vet |
 | POST | `/patients/favorites/:patient_id` | — | Marcar favorito |
 | DELETE | `/patients/favorites/:patient_id` | — | Quitar favorito |

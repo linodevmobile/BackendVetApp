@@ -78,6 +78,40 @@ const attachmentUploadSchema = z.object({
   label: z.string().optional(),
 });
 
+const preventiveCareKindEnum = z.enum(['vaccination', 'deworming_internal', 'deworming_external']);
+const preventiveCareModeEnum = z.enum(['plan', 'manual']);
+
+const preventiveCareListQuerySchema = z.object({
+  kind: preventiveCareKindEnum.optional(),
+  upcoming: z.coerce.boolean().optional().default(false),
+  days: z.coerce.number().int().min(1).max(365).optional().default(90),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const preventiveCareCreateSchema = z.object({
+  kind: preventiveCareKindEnum,
+  name: z.string().min(1),
+  product: z.string().optional(),
+  applied_at: z.string().optional(),
+  next_due_at: z.string().optional(),
+  mode: preventiveCareModeEnum.optional().default('manual'),
+  consultation_id: z.string().uuid().optional(),
+  notes: z.string().optional(),
+}).refine((v) => v.applied_at || v.next_due_at, {
+  message: 'Debe indicarse applied_at o next_due_at',
+});
+
+const preventiveCareUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  product: z.string().optional(),
+  applied_at: z.string().optional(),
+  next_due_at: z.string().optional(),
+  mode: preventiveCareModeEnum.optional(),
+  consultation_id: z.string().uuid().optional(),
+  notes: z.string().optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: 'Requiere al menos un campo' });
+
 module.exports = {
   createSchema,
   updateSchema,
@@ -88,4 +122,7 @@ module.exports = {
   appointmentsQuerySchema,
   attachmentsQuerySchema,
   attachmentUploadSchema,
+  preventiveCareListQuerySchema,
+  preventiveCareCreateSchema,
+  preventiveCareUpdateSchema,
 };

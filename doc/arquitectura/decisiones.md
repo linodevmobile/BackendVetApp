@@ -1,4 +1,4 @@
-> Última actualización: 2026-04-29 · Schema: v2.3
+> Última actualización: 2026-04-29 · Schema: v2.5
 
 # Decisiones arquitectónicas (ADR-style)
 
@@ -12,6 +12,28 @@ Bitácora cronológica de decisiones arquitectónicas significativas. Formato co
 - **Estado**: `vigente` | `superada por <ADR-N>` | `rollback`.
 
 > Las decisiones viejas no se editan ni se borran. Si una decisión se reemplaza, se marca como `superada por <fecha>` y se agrega una nueva entrada arriba con el reemplazo. Esto preserva el contexto histórico para devs nuevos.
+
+---
+
+## 2026-04-29 · `patient_preventive_care` unificada (vacunas + desparasitaciones)
+
+**Decisión**: una sola tabla `patient_preventive_care` con enum `preventive_care_kind` (`vaccination` / `deworming_internal` / `deworming_external`), en vez de dos tablas separadas (`patient_vaccinations` + `patient_dewormings`).
+
+**Contexto**: la pantalla de detalle de paciente tiene tab "Salud · Vacunas" + sección "Próximos recordatorios" en el resumen que mezcla vacunas y desparasitaciones. Ambos comparten la misma forma esencial (`name`, `applied_at`, `next_due_at`, `status` derivado).
+
+**Alternativas descartadas**:
+- **Dos tablas separadas** (`patient_vaccinations` + `patient_dewormings`): duplica esquema, repos, validadores, endpoints; sin ganancia real porque la shape es idéntica.
+- **Plan sugerido en DB** como tabla `preventive_care_plan_templates` editable: requeriría UI admin que no existe; los planes WSAVA cambian en intervalos de años, version-control en repo es suficiente.
+- **Generar plan con IA**: drift entre llamadas, costo, y la guía oficial debe ser determinística para un cliente clínico.
+
+**Consecuencias**:
+- Migración `v2.5_preventive_care.sql` con enums + tabla + índices + trigger `updated_at` + RLS.
+- Catálogo estático en `src/data/preventive_care_plans.json` (WSAVA + adaptación regional Colombia: Leishmania endémica, FeLV core en gatos outdoor, frecuencia desparasitación elevada por presión tropical).
+- Endpoints nuevos: `GET/POST /patients/:id/preventive-care`, `PATCH /:event_id`, `GET /:id/preventive-care/suggested-plan`.
+- `status` (`ok` / `soon` / `overdue` / `pending` / `applied`) se computa en backend a partir de `next_due_at` vs `now()` — no es columna almacenada (cambia con el tiempo).
+- Alergias / condiciones crónicas quedan **fuera de scope**: la app no las captura. Si en el futuro se necesitan, se modelan en `patient_alerts` (ya existente) o tabla nueva.
+
+**Estado**: vigente.
 
 ---
 

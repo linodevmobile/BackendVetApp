@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "source": "WSAVA Vaccination Guidelines 2024 + ESCCAP + adaptación regional Colombia",
+    "version": "1.0",
+    "updated_at": "2026-04-29",
+    "life_stages": {
+      "dog": { "puppy_max_months": 12, "senior_min_years": 8 },
+      "cat": { "puppy_max_months": 12, "senior_min_years": 10 }
+    }
+  },
+  "dog": {
+    "vaccination_core": [
+      {
+        "code": "dhppi_l",
+        "name": "Polivalente DHPPi-L",
+        "description": "Distemper + adenovirus + parvovirus + parainfluenza + leptospira",
+        "puppy_schedule_weeks": [6, 9, 12, 16],
+        "adult_interval_months": 12,
+        "regional": false,
+        "legal_required": false
+      },
+      {
+        "code": "rabies",
+        "name": "Antirrábica",
+        "description": "Vacuna antirrábica",
+        "puppy_schedule_weeks": [12],
+        "adult_interval_months": 12,
+        "regional": false,
+        "legal_required": true
+      }
+    ],
+    "vaccination_optional": [
+      {
+        "code": "kennel_cough",
+        "name": "Tos de las perreras",
+        "description": "Bordetella bronchiseptica + parainfluenza",
+        "puppy_schedule_weeks": [8],
+        "adult_interval_months": 12,
+        "condition": "guardería, exposición, viajes"
+      },
+      {
+        "code": "leishmania",
+        "name": "Leishmania (CaniLeish)",
+        "description": "Vacuna Leishmania infantum",
+        "puppy_schedule_weeks": [],
+        "min_age_months": 6,
+        "adult_interval_months": 12,
+        "condition": "zona endémica Colombia (Caribe, Magdalena medio, valles cálidos)"
+      }
+    ],
+    "deworming_internal": {
+      "name": "Desparasitación interna",
+      "puppy_schedule": "q2 sem hasta 12 sem, mensual hasta 6 m",
+      "puppy_interval_days_initial": 14,
+      "puppy_interval_days_after_12w": 30,
+      "adult_interval_months": 3,
+      "products_examples": ["pirantel", "praziquantel", "fenbendazol"]
+    },
+    "deworming_external": {
+      "name": "Desparasitación externa",
+      "adult_interval_days": 30,
+      "alt_interval_days": 90,
+      "products_examples": ["fipronil", "fluralaner", "afoxolaner"],
+      "notes": "Mensual tópico (fipronil) o trimestral oral (isoxazolinas). En Colombia presión alta de garrapatas."
+    }
+  },
+  "cat": {
+    "vaccination_core": [
+      {
+        "code": "fphc",
+        "name": "Triple felina (FPV + FHV + FCV)",
+        "description": "Panleukopenia + herpesvirus + calicivirus",
+        "puppy_schedule_weeks": [8, 12, 16],
+        "adult_interval_months": 12,
+        "adult_after_first_booster_months": 36,
+        "regional": false,
+        "legal_required": false
+      },
+      {
+        "code": "rabies",
+        "name": "Antirrábica",
+        "description": "Vacuna antirrábica",
+        "puppy_schedule_weeks": [12],
+        "adult_interval_months": 12,
+        "regional": false,
+        "legal_required": true
+      }
+    ],
+    "vaccination_optional": [
+      {
+        "code": "felv",
+        "name": "Leucemia felina (FeLV)",
+        "description": "Virus leucemia felina",
+        "puppy_schedule_weeks": [8, 12],
+        "adult_interval_months": 12,
+        "condition": "outdoor, multi-gato, contacto con gatos sin testar"
+      },
+      {
+        "code": "chlamydia",
+        "name": "Chlamydia felis",
+        "description": "Conjuntivitis crónica felina",
+        "puppy_schedule_weeks": [9, 12],
+        "adult_interval_months": 12,
+        "condition": "criaderos, refugios"
+      }
+    ],
+    "deworming_internal": {
+      "name": "Desparasitación interna",
+      "puppy_schedule": "q2 sem hasta 12 sem, mensual hasta 6 m",
+      "puppy_interval_days_initial": 14,
+      "puppy_interval_days_after_12w": 30,
+      "adult_interval_months": 3,
+      "products_examples": ["pirantel", "praziquantel"]
+    },
+    "deworming_external": {
+      "name": "Desparasitación externa",
+      "adult_interval_days": 30,
+      "products_examples": ["fipronil", "selamectina"],
+      "notes": "Mensual tópico, especialmente en gatos outdoor."
+    }
+  }
+}

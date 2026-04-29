@@ -13,6 +13,9 @@ const {
   appointmentsQuerySchema,
   attachmentsQuerySchema,
   attachmentUploadSchema,
+  preventiveCareListQuerySchema,
+  preventiveCareCreateSchema,
+  preventiveCareUpdateSchema,
 } = require('../validators/patientSchema');
 
 const router = express.Router();
@@ -37,5 +40,22 @@ router.post(
   validate({ body: attachmentUploadSchema }),
   ctrl.uploadAttachmentForPatient
 );
+
+router.get(
+  '/:id/preventive-care',
+  validate({ query: preventiveCareListQuerySchema }),
+  ctrl.listPreventiveCare
+);
+router.post(
+  '/:id/preventive-care',
+  validate({ body: preventiveCareCreateSchema }),
+  ctrl.createPreventiveCare
+);
+router.patch(
+  '/:id/preventive-care/:event_id',
+  validate({ body: preventiveCareUpdateSchema }),
+  ctrl.updatePreventiveCare
+);
+router.get('/:id/preventive-care/suggested-plan', ctrl.suggestedPreventiveCarePlan);
 
 module.exports = router;
