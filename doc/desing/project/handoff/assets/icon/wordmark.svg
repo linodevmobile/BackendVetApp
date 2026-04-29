@@ -1,0 +1,15 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 140" width="520" height="140">
+  
+  <g fill="#0052CC" transform="translate(16 24)">
+    <path d="M46 54 C 38 54 32 60 32 68 C 32 74 36 78 42 79 L 50 79 C 56 78 60 74 60 68 C 60 60 54 54 46 54 Z"></path>
+    <ellipse cx="33" cy="30" rx="6.5" ry="8.5" transform="rotate(-18 33 30)"></ellipse>
+    <ellipse cx="59" cy="30" rx="6.5" ry="8.5" transform="rotate(18 59 30)"></ellipse>
+    <ellipse cx="22" cy="42" rx="6" ry="7.5" transform="rotate(-42 22 42)"></ellipse>
+    <ellipse cx="70" cy="42" rx="6" ry="7.5" transform="rotate(42 70 42)"></ellipse>
+  </g>
+  
+  <text x="120" y="88" font-family="&#39;Instrument Serif&#39;, &#39;Times New Roman&#39;, serif" font-size="84" font-style="italic" fill="#0E1726" letter-spacing="-2">VetApp</text>
+  
+  <text x="122" y="112" font-family="&#39;JetBrains Mono&#39;, ui-monospace, Menlo, monospace" font-size="10" fill="#4C5563" letter-spacing="2" text-transform="uppercase">SOFTWARE CLÍNICO VETERINARIO</text>
+</svg>

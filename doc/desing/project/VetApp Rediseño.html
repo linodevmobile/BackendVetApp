@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VetApp — UX Rediseño</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #EEF0F3; font-family: 'Inter', sans-serif; color: #0E1726; }
+  body { min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; }
+  input, textarea { font-family: inherit; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes wave { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #C7C3B8; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="components/tokens.jsx"></script>
+<script type="text/babel" src="components/primitives.jsx"></script>
+<script type="text/babel" src="components/auth-system.jsx"></script>
+<script type="text/babel" src="components/dashboard.jsx"></script>
+<script type="text/babel" src="components/patient-search.jsx"></script>
+<script type="text/babel" src="components/patient-profile.jsx"></script>
+<script type="text/babel" src="components/consultation.jsx"></script>
+<script type="text/babel" src="components/analysis.jsx"></script>
+<script type="text/babel" src="components/hospitalization.jsx"></script>
+<script type="text/babel" src="components/hospital-patient.jsx"></script>
+
+<script type="text/babel">
+  const { useState, useEffect } = React;
+
+  function UtilChip({ children, onClick }) {
+    return (
+      <button onClick={onClick} style={{
+        padding: '6px 10px', borderRadius: 999,
+        border: `1px solid ${T.line}`, background: T.surface,
+        fontSize: 11, fontWeight: 500, color: T.ink80, cursor: 'pointer',
+        fontFamily: T.sans,
+      }}>{children}</button>
+    );
+  }
+
+  function TabBar({ current, onNav }) {
+    const tabs = [
+      { id: 'dashboard', icon: 'home',      label: 'Hoy' },
+      { id: 'patients',  icon: 'paw',       label: 'Pacientes' },
+      { id: 'consultation', icon: 'clipboard', label: 'Consulta', prominent: true },
+      { id: 'hospitalization', icon: 'bed', label: 'Hospital' },
+      { id: 'settings',  icon: 'user',      label: 'Perfil' },
+    ];
+    return (
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderTop: `1px solid ${T.line}`,
+        padding: '6px 0 30px', zIndex: 50,
+        display: 'flex',
+      }}>
+        {tabs.map(t => {
+          const active = (t.id === 'patients' && ['patients','patient','newpatient'].includes(current))
+                      || (t.id === current);
+          return (
+            <button key={t.id} onClick={() => onNav(t.id)} style={{
+              flex: 1, padding: '6px 4px', border: 'none', background: 'transparent',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              color: active ? T.accent : T.ink40,
+              cursor: 'pointer',
+            }}>
+              <Icon name={t.icon} size={20}/>
+              <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: 0.1 }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function NewPatient({ goto }) {
+    return (
+      <div style={{ padding: '16px 16px 100px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, paddingTop: 4 }}>
+          <button onClick={() => goto('patients')} style={{
+            width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.line}`,
+            background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}>
+            <Icon name="back" size={16} color={T.ink60}/>
+          </button>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: -0.4 }}>
+            Paciente nuevo
+          </h1>
+        </div>
+
+        <div style={{ fontSize: 12, color: T.ink60, marginBottom: 16, lineHeight: 1.5 }}>
+          Solo lo mínimo para empezar. Podrás completar el resto durante o después de la consulta.
+        </div>
+
+        <Card pad={16} style={{ marginBottom: 12 }}>
+          <Field label="Nombre del paciente">
+            <TextInput placeholder="Ej. Luna" value=""/>
+          </Field>
+        </Card>
+
+        <Card pad={16} style={{ marginBottom: 12 }}>
+          <Field label="Especie">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginTop: 2 }}>
+              {[['Perro','dog'],['Gato','cat'],['Conejo','rabbit'],['Ave','bird']].map(([l, s], i) => (
+                <button key={i} style={{
+                  padding: '10px 4px', border: `1px solid ${i === 0 ? T.ink : T.line}`,
+                  background: i === 0 ? T.ink : T.surface,
+                  color: i === 0 ? '#fff' : T.ink80,
+                  borderRadius: 10, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                }}>
+                  <span style={{ fontSize: 18 }}>{s === 'dog' ? '🐕' : s === 'cat' ? '🐈' : s === 'rabbit' ? '🐇' : '🐦'}</span>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </Card>
+
+        <Card pad={16} style={{ marginBottom: 12 }}>
+          <Field label="Raza">
+            <TextInput placeholder="Ej. Labrador retriever" value=""/>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {['Mestizo', 'Labrador', 'Golden', 'Bulldog', 'Pastor Alemán', 'Otra'].map((b, i) => (
+                <button key={i} style={{
+                  padding: '5px 10px', borderRadius: 999,
+                  border: `1px solid ${T.line}`, background: T.surface,
+                  fontSize: 11, fontWeight: 500, color: T.ink80, cursor: 'pointer',
+                }}>{b}</button>
+              ))}
+            </div>
+          </Field>
+        </Card>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          <Card pad={14}>
+            <Field label="Edad">
+              <TextInput placeholder="4 años" value=""/>
+            </Field>
+          </Card>
+          <Card pad={14}>
+            <Field label="Peso">
+              <TextInput placeholder="12.5 kg" value=""/>
+            </Field>
+          </Card>
+        </div>
+
+        <Card pad={16} style={{ marginBottom: 20 }}>
+          <Field label="Dueño">
+            <TextInput placeholder="Nombre y apellido" value=""/>
+          </Field>
+          <div style={{ height: 10 }}/>
+          <Field label="Teléfono">
+            <TextInput placeholder="+34 600 000 000" value=""/>
+          </Field>
+          <div style={{ height: 10 }}/>
+          <Field label="Email">
+            <TextInput placeholder="dueno@email.com" value=""/>
+          </Field>
+          <div style={{ height: 10 }}/>
+          <Field label="Dirección">
+            <TextInput placeholder="Calle, número, ciudad" value=""/>
+          </Field>
+        </Card>
+
+        <div style={{
+          padding: 12, background: T.aiSoft, borderRadius: 10,
+          border: `1px solid ${T.ai}33`,
+          fontSize: 12, color: T.ink80, lineHeight: 1.5, marginBottom: 16,
+          display: 'flex', gap: 10,
+        }}>
+          <Icon name="sparkle" size={16} color={T.ai}/>
+          <div>
+            <b>Tip:</b> también puedes crear el paciente dictando los datos durante la consulta.
+            La IA extraerá nombre, especie, edad y dueño.
+          </div>
+        </div>
+
+        <Btn variant="primary" size="lg" full icon="arrowR" onClick={() => goto('consultation')}>
+          Guardar y empezar consulta
+        </Btn>
+      </div>
+    );
+  }
+
+  function ComingSoon({ label, goto }) {
+    return (
+      <div style={{ padding: 24, textAlign: 'center', marginTop: 80 }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🚧</div>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+        <div style={{ fontSize: 13, color: T.ink60, maxWidth: 260, margin: '0 auto' }}>
+          Fuera del alcance de este rediseño. El foco está en el flujo de consulta.
+        </div>
+      </div>
+    );
+  }
+
+  function Phone({ screen, navigate, toast, toasts, dialog, setDialog, currentPatient, setCurrentPatient, overlay, setOverlay }) {
+    // Persistent screen — localStorage
+    return (
+      <div style={{
+        width: 390, height: 820, flexShrink: 0, borderRadius: 44, overflow: 'hidden',
+        position: 'relative', background: T.bg,
+        boxShadow: '0 30px 60px rgba(0,0,0,0.15), 0 0 0 10px #0E1726, 0 0 0 11px #050912',
+      }}>
+        {/* status bar */}
+        <div style={{
+          height: 44, padding: '14px 28px 0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
+          pointerEvents: 'none',
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>15:28</span>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <svg width="16" height="10" viewBox="0 0 16 10"><path d="M1 9h1M4 7h1M7 5h1M10 3h1M13 1h1" stroke={T.ink} strokeWidth="2" strokeLinecap="round"/></svg>
+            <div style={{ width: 22, height: 10, border: `1px solid ${T.ink}`, borderRadius: 3, position: 'relative', padding: 1 }}>
+              <div style={{ width: '75%', height: '100%', background: T.ink, borderRadius: 1 }}/>
+            </div>
+          </div>
+        </div>
+        {/* notch */}
+        <div style={{
+          position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+          width: 110, height: 30, borderRadius: 20, background: '#0A0908', zIndex: 101,
+        }}/>
+        {/* content */}
+        <div style={{ height: '100%', overflow: 'auto', paddingTop: 44, position: 'relative' }}>
+          {screen === 'dashboard'    && <Dashboard goto={navigate}/>}
+          {screen === 'patients'     && <PatientSearch goto={navigate}/>}
+          {screen === 'patient'      && <PatientProfile goto={navigate}/>}
+          {screen === 'newpatient'   && <NewPatient goto={navigate}/>}
+          {screen === 'consultation' && <Consultation goto={navigate}/>}
+          {screen === 'hospitalization' && <Hospitalization goto={navigate} toast={toast} setCurrentPatient={setCurrentPatient}/>}
+          {screen === 'hospital-patient' && currentPatient && <HospitalPatient patient={currentPatient} goto={navigate} toast={toast} onDischarge={() => { toast('success', `${currentPatient.name} dado de alta`); navigate('hospitalization'); }}/>}
+          {screen === 'login'        && <Login goto={navigate} toast={toast}/>}
+          {screen === 'splash'       && <Splash/>}
+          {screen === 'schedule'     && <ComingSoon label="Agenda completa" goto={navigate}/>}
+          {screen === 'settings'     && <ComingSoon label="Perfil del profesional" goto={navigate}/>}
+        </div>
+        {/* Toast overlay inside phone */}
+        <ToastStack toasts={toasts}/>
+        {/* Info dialog */}
+        {dialog && <InfoDialog {...dialog} onClose={() => setDialog(null)}/>}
+        {/* Standalone overlays (for chip demos) */}
+        {overlay === 'pause' && (
+          <PauseSheet
+            patient="Thor"
+            completed={6}
+            total={10}
+            onClose={() => setOverlay(null)}
+            onConfirm={() => { setOverlay(null); toast('success', 'Consulta pausada · disponible en el dashboard'); }}
+          />
+        )}
+        {/* tab bar — hidden on splash/login */}
+        {!['splash', 'login'].includes(screen) && <TabBar current={screen} onNav={navigate}/>}
+      </div>
+    );
+  }
+
+  function App() {
+    const [screen, setScreen] = useState(() => localStorage.getItem('vf:screen') || 'dashboard');
+    const [showAnalysis, setShowAnalysis] = useState(() => {
+      const v = localStorage.getItem('vf:analysis'); return v === null ? true : v === '1';
+    });
+
+    useEffect(() => { localStorage.setItem('vf:screen', screen); }, [screen]);
+    useEffect(() => { localStorage.setItem('vf:analysis', showAnalysis ? '1' : '0'); }, [showAnalysis]);
+
+    const navigate = (s) => setScreen(s);
+    const { toasts, push: toast } = useToasts();
+    const [dialog, setDialog] = useState(null);
+    const [currentPatient, setCurrentPatient] = useState(null);
+    const [overlay, setOverlay] = useState(null);
+    const openDialog = (d) => setDialog(d);
+    const cleanMode = true; // TEMP: hardcoded for screenshot capture
+
+    const screens = [
+      ['splash',       'Splash'],
+      ['login',        'Login'],
+      ['dashboard',    'Hoy'],
+      ['patients',     'Buscar'],
+      ['patient',      'Ficha paciente'],
+      ['newpatient',   'Nuevo paciente'],
+      ['consultation', 'Consulta'],
+      ['hospitalization', 'Hospital'],
+      ['hospital-patient', 'Ficha hospital'],
+    ];
+
+    if (cleanMode) {
+      return (
+        <div style={{
+          minHeight: '100vh', background: '#EEF0F3',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 40,
+        }}>
+          <Phone screen={screen} navigate={navigate} toast={toast} toasts={toasts} dialog={dialog} setDialog={setDialog} currentPatient={currentPatient} setCurrentPatient={setCurrentPatient} overlay={overlay} setOverlay={setOverlay}/>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        display: 'flex', minHeight: '100vh',
+        background: '#EEF0F3',
+      }}>
+        {/* Left: analysis */}
+        {showAnalysis && (
+          <div style={{
+            flex: '1 1 50%', minWidth: 0, maxWidth: 820,
+            background: T.bg, overflow: 'auto',
+            borderRight: `1px solid ${T.line}`,
+            height: '100vh',
+          }}>
+            <Analysis/>
+          </div>
+        )}
+
+        {/* Right: phone playground */}
+        <div style={{
+          flex: '1 1 50%', minWidth: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          padding: '24px 24px 40px',
+          height: '100vh', overflow: 'auto',
+        }}>
+          {/* Toolbar */}
+          <div style={{
+            width: '100%', maxWidth: 720, display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', marginBottom: 20, gap: 12,
+          }}>
+            <div>
+              <div style={{
+                fontSize: 10, color: T.ink40, fontFamily: T.mono,
+                textTransform: 'uppercase', letterSpacing: 1.2,
+              }}>Prototipo interactivo</div>
+              <div style={{ fontSize: 20, fontWeight: 500, letterSpacing: -0.3, fontFamily: T.serif, fontStyle: 'italic' }}>
+                VetApp · iOS
+              </div>
+            </div>
+            <button onClick={() => setShowAnalysis(a => !a)} style={{
+              padding: '8px 12px', background: T.surface,
+              border: `1px solid ${T.line}`, borderRadius: 10,
+              fontSize: 12, fontWeight: 500, color: T.ink80,
+              display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+            }}>
+              <Icon name="file" size={14}/>
+              {showAnalysis ? 'Ocultar análisis' : 'Ver análisis'}
+            </button>
+          </div>
+
+          {/* Screen switcher */}
+          <div style={{
+            width: '100%', maxWidth: 720, marginBottom: 20,
+            display: 'flex', gap: 6, flexWrap: 'wrap',
+          }}>
+            {screens.map(([id, label]) => (
+              <button key={id} onClick={() => navigate(id)} style={{
+                padding: '6px 10px', borderRadius: 999,
+                border: `1px solid ${screen === id ? T.ink : T.line}`,
+                background: screen === id ? T.ink : 'transparent',
+                color: screen === id ? '#fff' : T.ink80,
+                fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              }}>{label}</button>
+            ))}
+          </div>
+
+          <Phone screen={screen} navigate={navigate} toast={toast} toasts={toasts} dialog={dialog} setDialog={setDialog} currentPatient={currentPatient} setCurrentPatient={setCurrentPatient} overlay={overlay} setOverlay={setOverlay}/>
+
+          {/* Utility row — dialog + toast triggers */}
+          <div style={{
+            width: '100%', maxWidth: 420, marginTop: 16,
+            display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center',
+          }}>
+            <UtilChip onClick={() => toast('success', 'Consulta guardada')}>Toast success</UtilChip>
+            <UtilChip onClick={() => toast('error', 'Error de conexión')}>Toast error</UtilChip>
+            <UtilChip onClick={() => toast('info', 'Sincronizando…')}>Toast info</UtilChip>
+            <UtilChip onClick={() => openDialog({
+              tone: 'info',
+              title: 'Firma digital requerida',
+              body: 'Para cerrar la HC el sistema usará tu firma registrada. Esta acción queda auditada.',
+            })}>Dialog info</UtilChip>
+            <UtilChip onClick={() => openDialog({
+              tone: 'warn',
+              title: 'Medicación vencida',
+              body: 'Esta medicación venció hace 45 min. Registra motivo en la bitácora.',
+            })}>Dialog warn</UtilChip>
+            <UtilChip onClick={() => setOverlay('pause')}>Sheet: Pausar consulta</UtilChip>
+          </div>
+
+          <div style={{
+            marginTop: 20, maxWidth: 420, textAlign: 'center',
+            fontSize: 11, color: T.ink40, fontFamily: T.mono,
+            letterSpacing: 0.3, lineHeight: 1.6,
+          }}>
+            Tap tab bar to navigate · Tap mic in Consulta to see AI fill the focused section
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

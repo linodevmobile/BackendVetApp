@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>VetApp — Flutter Handoff</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F8F9FA;
+    --surface: #FFFFFF;
+    --surface-alt: #EEF0F3;
+    --line: #DDE2E8;
+    --line-soft: #E9ECF0;
+    --ink: #0E1726;
+    --ink80: #2B3748;
+    --ink60: #5A6576;
+    --ink40: #8B94A3;
+    --primary: #0052CC;
+    --primary-soft: #E1ECFB;
+    --primary-ink: #003D99;
+    --urgent: #D73A49;
+    --urgent-soft: #FBE2E4;
+    --ok: #2E7D3A;
+    --ok-soft: #DCEBDF;
+    --warn: #B8860B;
+    --warn-soft: #F7ECD0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: 'Inter', sans-serif; }
+  body { -webkit-font-smoothing: antialiased; line-height: 1.55; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 32px 120px; }
+
+  .kicker { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--ink40); margin-bottom: 10px; }
+  h1.hero { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 500; font-size: 52px; letter-spacing: -1.2px; line-height: 1.02; margin: 0 0 12px; }
+  h2 { font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 500; font-size: 32px; letter-spacing: -0.5px; margin: 56px 0 14px; }
+  h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.2px; margin: 28px 0 10px; }
+  p { font-size: 15px; color: var(--ink80); margin: 0 0 14px; max-width: 68ch; }
+  p.lead { font-size: 17px; color: var(--ink60); }
+  ul { padding-left: 20px; margin: 0 0 16px; }
+  li { font-size: 14px; color: var(--ink80); margin-bottom: 6px; }
+  a { color: var(--primary); text-decoration: none; border-bottom: 1px solid var(--primary-soft); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
+
+  /* Card */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 14px; }
+  .card.tight { padding: 14px 16px; }
+
+  /* Pill tag */
+  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+  .tag.primary { background: var(--primary-soft); color: var(--primary-ink); }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.urgent { background: var(--urgent-soft); color: var(--urgent); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .tag.neutral { background: var(--surface-alt); color: var(--ink80); }
+
+  /* Code */
+  pre { background: #0E1726; color: #E1ECFB; padding: 16px 18px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.6; overflow-x: auto; margin: 10px 0 20px; }
+  code.inline { background: var(--surface-alt); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--ink); border: 1px solid var(--line); }
+  pre .k { color: #7BA7E3; }
+  pre .s { color: #B8E0B3; }
+  pre .c { color: #6A7483; font-style: italic; }
+  pre .t { color: #E3B87B; }
+
+  /* Layout */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+  /* Swatch */
+  .swatch { border-radius: 10px; border: 1px solid var(--line); overflow: hidden; }
+  .swatch .chip { height: 64px; }
+  .swatch .meta { padding: 8px 10px; background: var(--surface); }
+  .swatch .name { font-size: 12px; font-weight: 600; }
+  .swatch .hex { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink60); }
+
+  /* Component row */
+  .comp-row { display: grid; grid-template-columns: 200px 1fr; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line-soft); align-items: start; }
+  .comp-row:last-child { border-bottom: none; }
+  .comp-row .name { font-weight: 600; font-size: 14px; }
+  .comp-row .desc { font-size: 13px; color: var(--ink60); margin-top: 3px; }
+  .comp-row .map  { font-size: 13px; color: var(--ink80); }
+  .comp-row .map code.inline { margin: 2px 3px 2px 0; display: inline-block; }
+
+  /* TOC */
+  .toc { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; margin: 0 0 32px; }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 13px; }
+  .toc li { margin: 4px 0; }
+
+  /* Quote */
+  blockquote { margin: 18px 0; padding: 12px 16px; background: var(--primary-soft); border-radius: 10px; font-size: 13px; color: var(--primary-ink); border-left: 3px solid var(--primary); }
+
+  /* Screen map table */
+  table.map { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 13px; }
+  table.map th { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink40); font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+  table.map td { padding: 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  table.map td.n { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink60); width: 40px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">VetApp · Flutter Handoff · v1</div>
+  <h1 class="hero">Del prototipo<br/>a Flutter.</h1>
+  <p class="lead">Todo lo que el dev necesita para reconstruir el prototipo en Flutter: tokens, tipografías, componentes mapeados a widgets, y decisiones de arquitectura.</p>
+
+  <div class="toc">
+    <div class="kicker" style="margin-bottom: 6px;">Contenido</div>
+    <ol>
+      <li><a href="#setup">Setup inicial</a></li>
+      <li><a href="#tokens">Tokens de diseño</a></li>
+      <li><a href="#type">Tipografía</a></li>
+      <li><a href="#components">Componentes → Widgets</a></li>
+      <li><a href="#screens">Mapa de pantallas</a></li>
+      <li><a href="#patterns">Patrones recurrentes</a></li>
+      <li><a href="#arch">Arquitectura sugerida</a></li>
+      <li><a href="#deliver">Entregables</a></li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════ SETUP ═══════════════════════ -->
+  <h2 id="setup">01 — Setup inicial</h2>
+  <p>Flutter 3.22+ con Material 3. Dependencias mínimas:</p>
+  <pre><span class="c"># pubspec.yaml</span>
+<span class="k">dependencies:</span>
+  <span class="k">flutter:</span>
+    <span class="k">sdk:</span> flutter
+  <span class="k">google_fonts:</span> ^6.2.1       <span class="c"># Inter, Instrument Serif, JetBrains Mono</span>
+  <span class="k">go_router:</span> ^14.2.0         <span class="c"># navegación tipada</span>
+  <span class="k">flutter_riverpod:</span> ^2.5.1   <span class="c"># state management</span>
+  <span class="k">intl:</span> ^0.19.0              <span class="c"># formato fechas/números es-CO</span>
+  <span class="k">record:</span> ^5.1.0             <span class="c"># grabación de audio (IA)</span>
+  <span class="k">signature:</span> ^5.5.0          <span class="c"># firma hológrafa (paso 10)</span></pre>
+
+  <p>Estructura de carpetas recomendada:</p>
+  <pre><span class="c">lib/</span>
+├── main.dart
+├── theme/
+│   ├── app_colors.dart         <span class="c">✓ entregado</span>
+│   ├── app_dimensions.dart     <span class="c">✓ entregado — radios, spacing, alturas</span>
+│   ├── app_text_styles.dart    <span class="c">✓ entregado</span>
+│   └── app_theme.dart          <span class="c">✓ entregado</span>
+├── widgets/                    <span class="c">→ primitives reusables</span>
+│   ├── vet_button.dart
+│   ├── vet_card.dart
+│   ├── vet_chip.dart
+│   ├── vet_field.dart
+│   ├── pet_avatar.dart
+│   └── section_title.dart
+├── features/
+│   ├── auth/                   <span class="c">splash + login</span>
+│   ├── dashboard/              <span class="c">Hoy</span>
+│   ├── patients/               <span class="c">lista, ficha, nuevo</span>
+│   ├── consultation/           <span class="c">SOAP canvas + IA</span>
+│   ├── hospitalization/
+│   └── history/
+├── models/
+└── services/
+    ├── ai_service.dart         <span class="c">transcripción + resumen</span>
+    └── sync_service.dart</pre>
+
+  <h3>Uso del theme</h3>
+  <pre><span class="c">// main.dart</span>
+<span class="k">import</span> <span class="s">'theme/app_theme.dart'</span>;
+
+<span class="t">MaterialApp</span>(
+  <span class="k">title:</span> <span class="s">'VetApp'</span>,
+  <span class="k">theme:</span> <span class="t">AppTheme</span>.light,
+  <span class="k">home:</span> <span class="t">SplashScreen</span>(),
+);</pre>
+
+  <!-- ══════════════════════ TOKENS ═══════════════════════ -->
+  <h2 id="tokens">02 — Tokens de diseño</h2>
+  <p>Los colores están en <code class="inline">AppColors</code>. Nunca hardcodees hex en widgets — siempre referencia la constante.</p>
+
+  <h3>Superficies</h3>
+  <div class="grid-4">
+    <div class="swatch"><div class="chip" style="background:#F8F9FA;border-bottom:1px solid #DDE2E8"></div><div class="meta"><div class="name">bg</div><div class="hex">#F8F9FA</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid #DDE2E8"></div><div class="meta"><div class="name">surface</div><div class="hex">#FFFFFF</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#EEF0F3"></div><div class="meta"><div class="name">surfaceAlt</div><div class="hex">#EEF0F3</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#DDE2E8"></div><div class="meta"><div class="name">line</div><div class="hex">#DDE2E8</div></div></div>
+  </div>
+
+  <h3>Tinta</h3>
+  <div class="grid-4">
+    <div class="swatch"><div class="chip" style="background:#0E1726"></div><div class="meta"><div class="name">ink</div><div class="hex">#0E1726</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#2B3748"></div><div class="meta"><div class="name">ink80</div><div class="hex">#2B3748</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#5A6576"></div><div class="meta"><div class="name">ink60</div><div class="hex">#5A6576</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#8B94A3"></div><div class="meta"><div class="name">ink40</div><div class="hex">#8B94A3</div></div></div>
+  </div>
+
+  <h3>Primario y señales</h3>
+  <div class="grid-4">
+    <div class="swatch"><div class="chip" style="background:#0052CC"></div><div class="meta"><div class="name">primary</div><div class="hex">#0052CC</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#E1ECFB"></div><div class="meta"><div class="name">primarySoft</div><div class="hex">#E1ECFB</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#D73A49"></div><div class="meta"><div class="name">urgent</div><div class="hex">#D73A49</div></div></div>
+    <div class="swatch"><div class="chip" style="background:#2E7D3A"></div><div class="meta"><div class="name">ok</div><div class="hex">#2E7D3A</div></div></div>
+  </div>
+
+  <h3>Radios y spacing</h3>
+  <div class="grid-2">
+    <div class="card tight">
+      <div class="kicker">AppRadii</div>
+      <ul>
+        <li><code class="inline">r1 = 4</code> — chips, pills</li>
+        <li><code class="inline">r2 = 8</code> — inputs, botones</li>
+        <li><code class="inline">r3 = 12</code> — cards, dialogs</li>
+        <li><code class="inline">r4 = 16</code> — sheets, splash</li>
+      </ul>
+    </div>
+    <div class="card tight">
+      <div class="kicker">AppSpacing</div>
+      <ul>
+        <li><code class="inline">xs=4, sm=8, md=12</code></li>
+        <li><code class="inline">lg=16, xl=20, xxl=24</code></li>
+        <li><code class="inline">section=40</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══════════════════════ TIPOGRAFÍA ═══════════════════════ -->
+  <h2 id="type">03 — Tipografía</h2>
+  <p>Tres familias. Usa siempre <code class="inline">AppText.xxx</code>, nunca <code class="inline">TextStyle(...)</code> inline.</p>
+
+  <div class="card">
+    <div style="font-family: 'Instrument Serif'; font-style: italic; font-size: 44px; letter-spacing: -1px; line-height: 1.05;">Hola de nuevo.</div>
+    <div class="kicker" style="margin-top:6px">displayLg · Instrument Serif italic 44/48 · -1</div>
+  </div>
+  <div class="card">
+    <div style="font-family: 'Inter'; font-size: 20px; font-weight: 600; letter-spacing: -0.4px;">Consulta en curso</div>
+    <div class="kicker" style="margin-top:6px">titleLg · Inter 20 SemiBold · -0.4</div>
+  </div>
+  <div class="card">
+    <div style="font-family: 'Inter'; font-size: 13px; color: #2B3748;">Registre los hallazgos clínicos y problemas detectados durante la evaluación del paciente.</div>
+    <div class="kicker" style="margin-top:6px">bodyMd · Inter 13 · ink80</div>
+  </div>
+  <div class="card">
+    <div style="font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: #8B94A3;">DIAGNÓSTICOS PROBABLES</div>
+    <div class="kicker" style="margin-top:6px">kicker · JetBrains Mono 10 · 1.4 tracking · ink40</div>
+  </div>
+
+  <pre><span class="c">// Uso</span>
+<span class="t">Text</span>(<span class="s">'Hola de nuevo.'</span>, <span class="k">style:</span> <span class="t">AppText</span>.displayLg),
+<span class="t">Text</span>(<span class="s">'Consulta en curso'</span>, <span class="k">style:</span> <span class="t">AppText</span>.titleLg),
+<span class="t">Text</span>(<span class="s">'DIAGNÓSTICOS'</span>, <span class="k">style:</span> <span class="t">AppText</span>.kicker),</pre>
+
+  <!-- ══════════════════════ COMPONENTES ═══════════════════════ -->
+  <h2 id="components">04 — Componentes → Widgets</h2>
+  <p>Cada primitive del prototipo tiene un equivalente Flutter. Abajo el mapeo directo y un snippet de referencia para cada uno.</p>
+
+  <div class="card">
+    <div class="comp-row">
+      <div>
+        <div class="name">VetButton</div>
+        <div class="desc">Botón primario / secundario / danger / AI</div>
+      </div>
+      <div class="map">
+        <code class="inline">Btn</code> → <code class="inline">ElevatedButton</code> (primary) · <code class="inline">OutlinedButton</code> (secondary) · <code class="inline">FilledButton.tonal</code> (ai)<br/>
+        Altura: <code class="inline">sm=32 · md=42 · lg=52</code>. Radio: <code class="inline">r2=8</code>. Con icon leading opcional.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">VetCard</div>
+        <div class="desc">Contenedor base con hairline</div>
+      </div>
+      <div class="map">
+        <code class="inline">Card</code> → <code class="inline">Container</code> con <code class="inline">BoxDecoration</code> (surface + border line + radius r3).<br/>
+        Evitar <code class="inline">Material Card</code> nativo — su sombra no está en sistema.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">VetChip</div>
+        <div class="desc">Tag con tono (neutral/primary/urgent/ok/warn)</div>
+      </div>
+      <div class="map">
+        <code class="inline">Chip</code> → <code class="inline">Container</code> con <code class="inline">bg = toneSoft</code>, <code class="inline">fg = tone</code>, <code class="inline">borderRadius: 999</code>, size xs/sm.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">VetField</div>
+        <div class="desc">Label + input + hint</div>
+      </div>
+      <div class="map">
+        <code class="inline">Field + TextInput</code> → <code class="inline">Column</code> (label <code class="inline">AppText.label</code> + <code class="inline">TextFormField</code>). El <code class="inline">InputDecorationTheme</code> global ya deja el look correcto.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">PetAvatar</div>
+        <div class="desc">Avatar circular por especie</div>
+      </div>
+      <div class="map">
+        <code class="inline">PetAvatar</code> → <code class="inline">CircleAvatar</code> con emoji de especie (🐕/🐈/🐇/🐦) o imagen; ring urgent si <code class="inline">urgent=true</code>.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">SectionTitle</div>
+        <div class="desc">Kicker + título + meta + trailing</div>
+      </div>
+      <div class="map">
+        <code class="inline">SectionTitle</code> → <code class="inline">Row</code> con <code class="inline">Column</code>(kicker+title) y <code class="inline">Spacer</code>+trailing.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">VetToast</div>
+        <div class="desc">Notificación auto-dismiss</div>
+      </div>
+      <div class="map">
+        <code class="inline">Toast</code> → <code class="inline">ScaffoldMessenger.showSnackBar</code> con custom content (icono circular + texto). Duración 3s.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">VetDialog / VetConfirm</div>
+        <div class="desc">Info / confirmación con ícono grande</div>
+      </div>
+      <div class="map">
+        <code class="inline">InfoDialog, ConfirmDialog</code> → <code class="inline">showDialog</code> + <code class="inline">Dialog</code> (no AlertDialog nativo). Ícono en círculo soft, botón full-width.
+      </div>
+    </div>
+    <div class="comp-row">
+      <div>
+        <div class="name">VetTabBar</div>
+        <div class="desc">Bottom navigation 5 ítems</div>
+      </div>
+      <div class="map">
+        <code class="inline">TabBar</code> → <code class="inline">NavigationBar</code> (M3) con blur. 5 destinos: Hoy / Pacientes / Consulta / Hospital / Perfil.
+      </div>
+    </div>
+  </div>
+
+  <h3>Ejemplo — VetButton</h3>
+  <pre><span class="k">class</span> <span class="t">VetButton</span> <span class="k">extends</span> <span class="t">StatelessWidget</span> {
+  <span class="k">final</span> <span class="t">String</span> label;
+  <span class="k">final</span> <span class="t">VoidCallback</span>? onPressed;
+  <span class="k">final</span> <span class="t">VetButtonVariant</span> variant;
+  <span class="k">final</span> <span class="t">VetButtonSize</span> size;
+  <span class="k">final</span> <span class="t">IconData</span>? icon;
+  <span class="k">final</span> <span class="t">bool</span> full;
+
+  <span class="k">const</span> <span class="t">VetButton</span>({
+    <span class="k">super</span>.key,
+    <span class="k">required</span> <span class="k">this</span>.label,
+    <span class="k">this</span>.onPressed,
+    <span class="k">this</span>.variant = <span class="t">VetButtonVariant</span>.primary,
+    <span class="k">this</span>.size = <span class="t">VetButtonSize</span>.md,
+    <span class="k">this</span>.icon,
+    <span class="k">this</span>.full = <span class="k">false</span>,
+  });
+
+  <span class="k">@override</span>
+  <span class="t">Widget</span> build(<span class="t">BuildContext</span> context) {
+    <span class="k">final</span> height = _height(size);
+    <span class="k">final</span> child = <span class="t">Row</span>(
+      <span class="k">mainAxisSize:</span> <span class="t">MainAxisSize</span>.min,
+      <span class="k">children:</span> [
+        <span class="k">if</span> (icon != <span class="k">null</span>) ...[
+          <span class="t">Icon</span>(icon, <span class="k">size:</span> 16),
+          <span class="k">const</span> <span class="t">SizedBox</span>(<span class="k">width:</span> 8),
+        ],
+        <span class="t">Text</span>(label, <span class="k">style:</span> <span class="t">AppText</span>.button),
+      ],
+    );
+    <span class="k">return</span> <span class="t">SizedBox</span>(
+      <span class="k">height:</span> height,
+      <span class="k">width:</span> full ? <span class="k">double</span>.infinity : <span class="k">null</span>,
+      <span class="k">child:</span> _byVariant(context, child),
+    );
+  }
+}</pre>
+
+  <h3>Ejemplo — VetCard</h3>
+  <pre><span class="k">class</span> <span class="t">VetCard</span> <span class="k">extends</span> <span class="t">StatelessWidget</span> {
+  <span class="k">final</span> <span class="t">Widget</span> child;
+  <span class="k">final</span> <span class="t">EdgeInsets</span> padding;
+  <span class="k">final</span> <span class="t">VoidCallback</span>? onTap;
+
+  <span class="k">const</span> <span class="t">VetCard</span>({
+    <span class="k">super</span>.key,
+    <span class="k">required</span> <span class="k">this</span>.child,
+    <span class="k">this</span>.padding = <span class="k">const</span> <span class="t">EdgeInsets</span>.all(16),
+    <span class="k">this</span>.onTap,
+  });
+
+  <span class="k">@override</span>
+  <span class="t">Widget</span> build(<span class="t">BuildContext</span> context) {
+    <span class="k">return</span> <span class="t">InkWell</span>(
+      <span class="k">onTap:</span> onTap,
+      <span class="k">borderRadius:</span> <span class="t">BorderRadius</span>.circular(<span class="t">AppRadii</span>.r3),
+      <span class="k">child:</span> <span class="t">Container</span>(
+        <span class="k">padding:</span> padding,
+        <span class="k">decoration:</span> <span class="t">BoxDecoration</span>(
+          <span class="k">color:</span> <span class="t">AppColors</span>.surface,
+          <span class="k">border:</span> <span class="t">Border</span>.all(<span class="k">color:</span> <span class="t">AppColors</span>.line),
+          <span class="k">borderRadius:</span> <span class="t">BorderRadius</span>.circular(<span class="t">AppRadii</span>.r3),
+        ),
+        <span class="k">child:</span> child,
+      ),
+    );
+  }
+}</pre>
+
+  <!-- ══════════════════════ PANTALLAS ═══════════════════════ -->
+  <h2 id="screens">05 — Mapa de pantallas</h2>
+  <p>Cada pantalla del prototipo → una <code class="inline">feature</code> en Flutter. Abajo el mapeo con ruta GoRouter y estado principal.</p>
+
+  <table class="map">
+    <thead><tr><th>#</th><th>Prototipo</th><th>Flutter file</th><th>Ruta</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td class="n">01</td><td>Splash</td><td><code class="inline">features/auth/splash_screen.dart</code></td><td><code class="inline">/</code></td><td>Boot check → redirige</td></tr>
+      <tr><td class="n">02</td><td>Login</td><td><code class="inline">features/auth/login_screen.dart</code></td><td><code class="inline">/login</code></td><td><code class="inline">authProvider</code></td></tr>
+      <tr><td class="n">03</td><td>Hoy (Dashboard)</td><td><code class="inline">features/dashboard/dashboard_screen.dart</code></td><td><code class="inline">/home</code></td><td>agenda + hospitalizados</td></tr>
+      <tr><td class="n">04</td><td>Buscar paciente</td><td><code class="inline">features/patients/patient_search_screen.dart</code></td><td><code class="inline">/patients</code></td><td>query + lista</td></tr>
+      <tr><td class="n">05</td><td>Ficha paciente</td><td><code class="inline">features/patients/patient_profile_screen.dart</code></td><td><code class="inline">/patients/:id</code></td><td><code class="inline">patientProvider</code></td></tr>
+      <tr><td class="n">06</td><td>Nuevo paciente</td><td><code class="inline">features/patients/new_patient_screen.dart</code></td><td><code class="inline">/patients/new</code></td><td>form state</td></tr>
+      <tr><td class="n">07</td><td>Consulta (SOAP canvas)</td><td><code class="inline">features/consultation/consultation_screen.dart</code></td><td><code class="inline">/consult/:id</code></td><td><code class="inline">consultationProvider</code> + <code class="inline">aiService</code></td></tr>
+      <tr><td class="n">08</td><td>Hospitalización</td><td><code class="inline">features/hospitalization/hospitalization_screen.dart</code></td><td><code class="inline">/hospital</code></td><td>tabs + vitales live</td></tr>
+      <tr><td class="n">09</td><td>Historia clínica</td><td><code class="inline">features/history/history_screen.dart</code></td><td><code class="inline">/patients/:id/history</code></td><td>lista de HCs firmadas</td></tr>
+      <tr><td class="n">10</td><td>Bottom sheet HC</td><td><code class="inline">features/history/hc_sheet.dart</code></td><td>modal</td><td>read-only + addendum</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════════════ PATRONES ═══════════════════════ -->
+  <h2 id="patterns">06 — Patrones recurrentes</h2>
+
+  <h3>SOAP Canvas — los 10 puntos obligatorios</h3>
+  <p>La consulta es <strong>una sola pantalla con acordeones</strong>, no un wizard lineal. Cada sección tiene estado <code class="inline">empty / partial / complete</code> y contribuye al contador <code class="inline">X/10</code>. Firma bloqueada hasta 10/10.</p>
+  <blockquote>Res. 8430 exige los 10 puntos, <b>no</b> exige orden. Permite completar en paralelo, saltar entre secciones, y dictar cualquiera con IA.</blockquote>
+
+  <h3>Micrófono focus-aware</h3>
+  <p>Un solo FAB de micrófono persistente en la parte inferior de la consulta. Lee la sección activa (<code class="inline">focusedSection</code>) y rellena ese campo con el resumen estructurado. Nunca abre pantalla aparte.</p>
+  <pre><span class="t">Future</span>&lt;<span class="t">void</span>&gt; onMicTap() <span class="k">async</span> {
+  <span class="k">final</span> section = ref.read(focusedSectionProvider);
+  <span class="k">final</span> audio = <span class="k">await</span> aiService.record();
+  <span class="k">final</span> summary = <span class="k">await</span> aiService.summarize(audio, section: section);
+  ref.read(consultationProvider.notifier).applyAi(section, summary);
+  <span class="c">// marca con ✦ para trazabilidad</span>
+}</pre>
+
+  <h3>Contenido generado por IA</h3>
+  <p>Todo lo que venga del servicio IA se marca con <code class="inline">isAiGenerated: true</code> y renderiza con un dot azul (<code class="inline">AppColors.ai</code>) previo al texto. Es editable en el acto — el usuario puede corregir y la bandera cae a <code class="inline">isAiGenerated: false</code>.</p>
+
+  <h3>Toasts por acción</h3>
+  <p>Guardar/editar/eliminar siempre disparan toast. Nunca diálogo modal para confirmación positiva. Solo usar <code class="inline">ConfirmDialog</code> para acciones destructivas (alta, cerrar HC, borrar paciente).</p>
+
+  <h3>Pantallas críticas (hospital)</h3>
+  <p>Vitales fuera de rango → pintar la card con <code class="inline">urgentSoft</code> + texto <code class="inline">urgent</code>. Tareas vencidas → mismo patrón. Nunca usar solo color — siempre combinar con icono de alerta para accesibilidad.</p>
+
+  <!-- ══════════════════════ ARQUITECTURA ═══════════════════════ -->
+  <h2 id="arch">07 — Arquitectura sugerida</h2>
+
+  <h3>State management</h3>
+  <p><strong>Riverpod 2.x</strong>. Providers por feature. Evita <code class="inline">setState</code> global — solo UI local.</p>
+
+  <h3>Persistencia</h3>
+  <p><strong>Isar</strong> para datos locales (pacientes, HCs, internados). HC firmada es inmutable — crea un <code class="inline">Addendum</code> aparte, nunca edites el original. <strong>Hive</strong> está bien para settings/cache.</p>
+
+  <h3>Sync</h3>
+  <p>La app debe funcionar offline (consulta en campo). Cola de writes que se envían cuando hay red. Mostrar banner <code class="inline">warn</code> cuando hay pendientes.</p>
+
+  <h3>Servicio de IA</h3>
+  <pre><span class="k">abstract class</span> <span class="t">AiService</span> {
+  <span class="t">Future</span>&lt;<span class="t">String</span>&gt; transcribe(<span class="t">File</span> audio);
+  <span class="t">Future</span>&lt;<span class="t">AiSummary</span>&gt; summarize(<span class="t">String</span> text, {<span class="k">required</span> <span class="t">SoapSection</span> section});
+}
+
+<span class="k">class</span> <span class="t">AiSummary</span> {
+  <span class="k">final</span> <span class="t">String</span> structured;  <span class="c">// texto limpio</span>
+  <span class="k">final</span> <span class="t">List</span>&lt;<span class="t">String</span>&gt; tags;    <span class="c">// chips sugeridos</span>
+  <span class="k">final</span> <span class="t">double</span> confidence;
+}</pre>
+
+  <h3>Navegación</h3>
+  <p><strong>GoRouter</strong> con <code class="inline">StatefulShellRoute</code> para mantener la <code class="inline">NavigationBar</code> persistente. Splash y Login quedan fuera del shell.</p>
+
+  <!-- ══════════════════════ ENTREGABLES ═══════════════════════ -->
+  <h2 id="deliver">08 — Entregables</h2>
+  <p>En la carpeta <code class="inline">handoff/</code> de este proyecto tienes ya listos los tres archivos de tema. Cópialos a tu proyecto Flutter en <code class="inline">lib/theme/</code>:</p>
+  <div class="card">
+    <ul style="margin:0">
+      <li><code class="inline">lib/theme/app_colors.dart</code> <span class="tag ok">listo</span></li>
+      <li><code class="inline">lib/theme/app_dimensions.dart</code> <span class="tag ok">listo</span></li>
+      <li><code class="inline">lib/theme/app_text_styles.dart</code> <span class="tag ok">listo</span></li>
+      <li><code class="inline">lib/theme/app_theme.dart</code> <span class="tag ok">listo</span></li>
+    </ul>
+  </div>
+
+  <h3>Próximos pasos sugeridos</h3>
+  <ol style="padding-left:20px;font-size:14px;color:var(--ink80)">
+    <li>Crear proyecto Flutter + copiar <code class="inline">lib/theme/</code>.</li>
+    <li>Implementar las 6 primitives en <code class="inline">lib/widgets/</code> (Button/Card/Chip/Field/PetAvatar/SectionTitle).</li>
+    <li>Empezar por Splash → Login → Dashboard (flujo de arranque).</li>
+    <li>Construir el SOAP Canvas de consulta — es la pieza central, le dedicaría 2 sprints.</li>
+    <li>Integrar servicio IA (mock primero, real después).</li>
+    <li>Hospitalización + Historia — son lectura con sheets, rápido.</li>
+  </ol>
+
+  <blockquote style="margin-top:28px">
+    <b>Regla de oro:</b> cuando tengas dudas de un detalle visual, <b>abre el prototipo HTML</b>. Es la fuente de verdad. Este documento es solo el mapa.
+  </blockquote>
+
+  <div style="margin-top:60px;padding-top:20px;border-top:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink40);letter-spacing:1px;text-transform:uppercase;">
+    VetApp · Flutter Handoff · Abril 2026
+  </div>
+
+</div>
+</body>
+</html>
