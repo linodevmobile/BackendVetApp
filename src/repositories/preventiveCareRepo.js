@@ -206,4 +206,48 @@ async function suggestedPlan(supabase, patientId) {
   };
 }
 
-module.exports = { listByPatient, create, update, suggestedPlan };
+async function applyNext(supabase, vetId, patientId, { kind } = {}) {
+  const plan = await suggestedPlan(supabase, patientId);
+  if (!plan.items.length) {
+    return { error: 'no_plan', message: plan.note || 'Sin plan sugerido para esta especie' };
+  }
+
+  const filtered = kind ? plan.items.filter((i) => i.kind === kind) : plan.items;
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.group === 'core' && b.group !== 'core') return -1;
+    if (b.group === 'core' && a.group !== 'core') return 1;
+    return 0;
+  });
+
+  const next = sorted.find((i) => !i.applied);
+  if (!next) {
+    return { error: 'plan_complete', message: 'Plan completo, no hay siguiente aplicación pendiente' };
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  let nextDueAt = null;
+  if (next.adult_interval_months) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + next.adult_interval_months);
+    nextDueAt = d.toISOString().slice(0, 10);
+  } else if (next.adult_interval_days) {
+    const d = new Date();
+    d.setDate(d.getDate() + next.adult_interval_days);
+    nextDueAt = d.toISOString().slice(0, 10);
+  }
+
+  const created = await create(supabase, vetId, patientId, {
+    kind: next.kind,
+    name: next.name,
+    product: null,
+    applied_at: todayStr,
+    next_due_at: nextDueAt,
+    mode: 'plan',
+    notes: null,
+  });
+
+  return { row: created, source_item: { code: next.code || null, group: next.group, name: next.name } };
+}
+
+module.exports = { listByPatient, create, update, suggestedPlan, applyNext };

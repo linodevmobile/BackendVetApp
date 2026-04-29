@@ -112,6 +112,10 @@ const preventiveCareUpdateSchema = z.object({
   notes: z.string().optional(),
 }).refine((v) => Object.keys(v).length > 0, { message: 'Requiere al menos un campo' });
 
+const preventiveCareApplyNextSchema = z.object({
+  kind: preventiveCareKindEnum.optional(),
+}).partial();
+
 module.exports = {
   createSchema,
   updateSchema,
@@ -125,4 +129,5 @@ module.exports = {
   preventiveCareListQuerySchema,
   preventiveCareCreateSchema,
   preventiveCareUpdateSchema,
+  preventiveCareApplyNextSchema,
 };

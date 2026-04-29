@@ -16,6 +16,7 @@ const {
   preventiveCareListQuerySchema,
   preventiveCareCreateSchema,
   preventiveCareUpdateSchema,
+  preventiveCareApplyNextSchema,
 } = require('../validators/patientSchema');
 
 const router = express.Router();
@@ -57,5 +58,10 @@ router.patch(
   ctrl.updatePreventiveCare
 );
 router.get('/:id/preventive-care/suggested-plan', ctrl.suggestedPreventiveCarePlan);
+router.post(
+  '/:id/preventive-care/apply-next',
+  validate({ body: preventiveCareApplyNextSchema }),
+  ctrl.applyNextPreventiveCare
+);
 
 module.exports = router;

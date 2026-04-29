@@ -50,6 +50,7 @@ Este apartado lista las rutas existentes con su propósito, body/query principal
 | POST | `/patients/:id/preventive-care` | `{ kind, name, product?, applied_at?, next_due_at?, mode?, consultation_id?, notes? }` | Registra evento (debe traer `applied_at` o `next_due_at`) |
 | PATCH | `/patients/:id/preventive-care/:event_id` | body parcial | Actualiza evento (re-programar, marcar aplicada) |
 | GET | `/patients/:id/preventive-care/suggested-plan` | — | Plan WSAVA + regional CO según species + life_stage, cruzado con historial |
+| POST | `/patients/:id/preventive-care/apply-next` | `{ kind? }` opcional | Aplica siguiente item pendiente del plan (core > optional). Devuelve fila + `source_item`. 409 si plan completo |
 | GET | `/patients/favorites` | — | Pacientes favoritos del vet |
 | POST | `/patients/favorites/:patient_id` | — | Marcar favorito |
 | DELETE | `/patients/favorites/:patient_id` | — | Quitar favorito |

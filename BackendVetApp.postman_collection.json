@@ -326,6 +326,16 @@
             "description": "Plan sugerido WSAVA + adaptación regional Colombia, según `species` y life_stage del paciente (calculado de `date_of_birth`).\n\nDevuelve items con:\n- `kind`, `group` (`core` / `optional`)\n- Para vacunas: `code`, `name`, `description`, `legal_required`, `puppy_schedule_weeks`, `adult_interval_months`\n- Para desparasitaciones: `name`, `products_examples`, `adult_interval_months` o `adult_interval_days`\n- `applied_at`, `next_due_at`, `applied: bool` — cruzando con `patient_preventive_care`\n\nCatálogo en `src/data/preventive_care_plans.json`. No requiere fila previa en DB.",
             "url": "{{base_url}}/patients/{{patient_id}}/preventive-care/suggested-plan"
           }
+        },
+        {
+          "name": "Preventive Care — Apply Next",
+          "request": {
+            "method": "POST",
+            "description": "Botón \"Aplicar siguiente del plan\" del mockup. Backend resuelve qué item aplicar.\n\n## Lógica\n1. Carga catálogo (`src/data/preventive_care_plans.json`) según `species` + life_stage del paciente.\n2. Cruza con `patient_preventive_care` existente.\n3. Toma el primer item pendiente, priorizando `core` sobre `optional`. Si se envía `kind`, filtra por ese tipo.\n4. Calcula `next_due_at = hoy + interval` (months para vacunas / desparasitación interna, days para externa).\n5. Inserta fila con `mode='plan'`, `applied_at=hoy`, `applied_by_vet_id` desde JWT.\n\n## Body JSON (opcional)\n| Campo | Tipo | Notas |\n|---|---|---|\n| `kind` | enum | `vaccination` \\| `deworming_internal` \\| `deworming_external`. Si se omite, considera todos los kinds. |\n\nPasar `{}` o body vacío para no filtrar.\n\n## Respuesta (ejemplo)\n```json\n{\n  \"data\": {\n    \"id\": \"uuid\",\n    \"kind\": \"vaccination\",\n    \"name\": \"Polivalente DHPPi-L\",\n    \"applied_at\": \"2026-04-29\",\n    \"next_due_at\": \"2027-04-29\",\n    \"mode\": \"plan\",\n    \"status\": \"ok\",\n    \"applied_by_vet_id\": \"uuid\",\n    \"source_item\": { \"code\": \"dhppi_l\", \"group\": \"core\", \"name\": \"Polivalente DHPPi-L\" }\n  }\n}\n```\n\n## Errores\n- `404 NOT_FOUND` — paciente sin plan para su especie (ej: `exotic`).\n- `409 CONFLICT` — plan completo, no quedan items pendientes con el filtro aplicado.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{base_url}}/patients/{{patient_id}}/preventive-care/apply-next"
+          }
         }
       ]
     },

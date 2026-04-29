@@ -106,6 +106,7 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 - `POST /patients/:id/preventive-care` — `{ kind: vaccination|deworming_internal|deworming_external, name, product?, applied_at?, next_due_at?, mode: plan|manual, consultation_id?, notes? }`. Debe traer al menos una de `applied_at` o `next_due_at`. Si trae `applied_at`, `applied_by_vet_id` se setea desde JWT.
 - `PATCH /patients/:id/preventive-care/:event_id` — actualiza `name`, `product`, `applied_at`, `next_due_at`, `mode`, `consultation_id`, `notes`.
 - `GET /patients/:id/preventive-care/suggested-plan` — proyecta plan WSAVA + regional Colombia según `species` + life_stage del paciente, cruzado con su historial. Items incluyen `applied: bool` y `next_due_at` proyectado. Catálogo en `src/data/preventive_care_plans.json`.
+- `POST /patients/:id/preventive-care/apply-next` — body opcional `{ kind? }`. Backend resuelve el siguiente ítem pendiente del plan (priorizando `core` sobre `optional`, filtrado por `kind` si se envía), lo registra como aplicado hoy con `mode='plan'` y proyecta `next_due_at` desde el intervalo del catálogo. Devuelve la fila + `source_item` (referencia al item del catálogo). Errores: `404 NOT_FOUND` si no hay plan para la especie, `409 CONFLICT` si ya no quedan pendientes.
 
 ### Appointments
 - `GET /appointments/today`
