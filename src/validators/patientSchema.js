@@ -20,13 +20,14 @@ const createSchema = z.object({
   message: 'Debe indicarse date_of_birth o age_years',
 });
 
+// weight_kg removed: weight is now tracked via patient_measurements
+// (synced on consultation sign). patients.weight_kg is auto-cached by trigger.
 const updateSchema = z.object({
   name: z.string().optional(),
   species: speciesEnum.optional(),
   breed: z.string().optional(),
   sex: sexEnum.optional(),
   date_of_birth: z.string().optional(),
-  weight_kg: z.number().positive().optional(),
   microchip: z.string().optional(),
   owner_name: z.string().optional(),
   owner_phone: z.string().optional(),
@@ -41,4 +42,24 @@ const listQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
-module.exports = { createSchema, updateSchema, listQuerySchema };
+const measurementsListQuerySchema = z.object({
+  metric: z.enum(['weight_kg', 'temperature_c', 'heart_rate_bpm', 'respiratory_rate_rpm', 'bcs'])
+    .optional()
+    .default('weight_kg'),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const timelineListQuerySchema = z.object({
+  type: z.enum(['all', 'consultation', 'attachment']).optional().default('all'),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+module.exports = {
+  createSchema,
+  updateSchema,
+  listQuerySchema,
+  measurementsListQuerySchema,
+  timelineListQuerySchema,
+};

@@ -1,3 +1,21 @@
+const measurementsRepo = require('./measurementsRepo');
+
+const MEASUREMENT_SECTIONS = ['vitals', 'physical_exam'];
+
+// If the section is a measurement source AND its consultation is already signed,
+// re-sync patient_measurements so post-sign edits propagate to the history.
+async function maybeResyncMeasurement(supabase, consultationId, section) {
+  if (!MEASUREMENT_SECTIONS.includes(section)) return;
+  const { data: consultation } = await supabase
+    .from('consultations')
+    .select('status')
+    .eq('id', consultationId)
+    .maybeSingle();
+  if (consultation?.status === 'signed') {
+    await measurementsRepo.syncFromConsultation(supabase, { consultationId });
+  }
+}
+
 async function upsert(supabase, { consultationId, section, transcription, aiSuggested, text, audioUrl, overwriteText }) {
   const { data: existing } = await supabase
     .from('consultation_sections')
@@ -57,6 +75,7 @@ async function upsertPartial(supabase, { consultationId, section, fields }) {
     .eq('section', section)
     .maybeSingle();
 
+  let result;
   if (existing) {
     const { data, error } = await supabase
       .from('consultation_sections')
@@ -66,16 +85,19 @@ async function upsertPartial(supabase, { consultationId, section, fields }) {
       .select('*')
       .single();
     if (error) throw error;
-    return data;
+    result = data;
+  } else {
+    const { data, error } = await supabase
+      .from('consultation_sections')
+      .insert({ consultation_id: consultationId, section, ...patch })
+      .select('*')
+      .single();
+    if (error) throw error;
+    result = data;
   }
 
-  const { data, error } = await supabase
-    .from('consultation_sections')
-    .insert({ consultation_id: consultationId, section, ...patch })
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data;
+  await maybeResyncMeasurement(supabase, consultationId, section);
+  return result;
 }
 
 async function listByConsultation(supabase, consultationId) {

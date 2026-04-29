@@ -266,6 +266,34 @@ CREATE TABLE files (
 );
 
 -- =====================
+-- 10b. PATIENT MEASUREMENTS (clinical events: weight + vitals + BCS)
+-- =====================
+-- One row per measurement event. Sources: consultation/manual/hospitalization.
+-- patients.weight_kg is a derived cache kept in sync by trg_sync_patient_weight.
+
+CREATE TABLE patient_measurements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  consultation_id UUID REFERENCES consultations(id) ON DELETE SET NULL,
+  hospitalization_id UUID REFERENCES hospitalizations(id) ON DELETE SET NULL,
+  measured_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  measured_by_vet_id UUID REFERENCES veterinarians(id),
+  source TEXT NOT NULL CHECK (source IN ('consultation','manual','hospitalization')),
+  weight_kg DECIMAL(6,2),
+  temperature_c DECIMAL(4,1),
+  heart_rate_bpm INTEGER,
+  respiratory_rate_rpm INTEGER,
+  bcs TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_measurement_at_least_one CHECK (
+    weight_kg IS NOT NULL OR temperature_c IS NOT NULL
+    OR heart_rate_bpm IS NOT NULL OR respiratory_rate_rpm IS NOT NULL
+    OR bcs IS NOT NULL
+  )
+);
+
+-- =====================
 -- 11. INDEXES
 -- =====================
 
@@ -297,6 +325,15 @@ CREATE INDEX idx_hospitalizations_patient ON hospitalizations(patient_id);
 CREATE INDEX idx_hospitalizations_status ON hospitalizations(status);
 CREATE INDEX idx_files_patient ON files(patient_id);
 CREATE INDEX idx_files_consultation ON files(consultation_id);
+
+CREATE INDEX idx_measurements_patient_date
+  ON patient_measurements(patient_id, measured_at DESC);
+CREATE INDEX idx_measurements_weight
+  ON patient_measurements(patient_id, measured_at DESC)
+  WHERE weight_kg IS NOT NULL;
+CREATE UNIQUE INDEX uq_measurements_consultation
+  ON patient_measurements(consultation_id)
+  WHERE source = 'consultation';
 
 -- =====================
 -- 12. UPDATED_AT TRIGGER
@@ -338,6 +375,30 @@ CREATE TRIGGER trg_hospitalizations_updated
   BEFORE UPDATE ON hospitalizations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+-- Trigger: keep patients.weight_kg as cache of latest known weight.
+CREATE OR REPLACE FUNCTION sync_patient_weight_cache()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.weight_kg IS NOT NULL THEN
+    UPDATE patients
+       SET weight_kg = NEW.weight_kg
+     WHERE id = NEW.patient_id
+       AND NOT EXISTS (
+         SELECT 1 FROM patient_measurements
+          WHERE patient_id = NEW.patient_id
+            AND weight_kg IS NOT NULL
+            AND measured_at > NEW.measured_at
+            AND id <> NEW.id
+       );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_patient_weight
+  AFTER INSERT OR UPDATE ON patient_measurements
+  FOR EACH ROW EXECUTE FUNCTION sync_patient_weight_cache();
+
 -- =====================
 -- 13. ROW LEVEL SECURITY
 -- =====================
@@ -357,6 +418,7 @@ ALTER TABLE order_medications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE treatment_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hospitalizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patient_measurements ENABLE ROW LEVEL SECURITY;
 
 -- veterinarians: a vet can see/update only their own profile
 CREATE POLICY vet_self_select ON veterinarians
@@ -548,6 +610,24 @@ CREATE POLICY files_vet_all ON files
       SELECT 1 FROM consultations c
       WHERE c.id = files.consultation_id AND c.veterinarian_id = auth.uid()
     ))
+  );
+
+-- patient_measurements: via patient ownership
+CREATE POLICY measurements_vet_all ON patient_measurements
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM patients p
+       WHERE p.id = patient_measurements.patient_id
+         AND p.created_by_vet_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM patients p
+       WHERE p.id = patient_measurements.patient_id
+         AND p.created_by_vet_id = auth.uid()
+    )
   );
 
 -- =====================

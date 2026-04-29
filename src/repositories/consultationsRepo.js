@@ -1,3 +1,5 @@
+const measurementsRepo = require('./measurementsRepo');
+
 async function listRecentSigned(supabase, vetId, limit = 4) {
   const { data, error } = await supabase
     .from('consultations')
@@ -90,13 +92,15 @@ async function resume(supabase, vetId, id) {
 }
 
 async function sign(supabase, vetId, id, payload) {
-  return updateStatus(supabase, vetId, id, {
+  const updated = await updateStatus(supabase, vetId, id, {
     status: 'signed',
     result: payload.result,
     summary: payload.summary || null,
     primary_diagnosis: payload.primary_diagnosis || null,
     signed_at: new Date().toISOString(),
   });
+  await measurementsRepo.syncFromConsultation(supabase, { consultationId: id });
+  return updated;
 }
 
 module.exports = {

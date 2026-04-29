@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>VetApp — Assets (Icono + Especies)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: #F8F9FA;
+    font-family: 'Inter', sans-serif; color: #0E1726;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 80px; }
+  header .kicker {
+    font: 500 10px/1 'JetBrains Mono', monospace;
+    letter-spacing: 1.6px; text-transform: uppercase; color: #767B87;
+  }
+  header h1 {
+    font: italic 400 42px/1.1 'Instrument Serif', serif;
+    letter-spacing: -0.5px; margin: 8px 0 6px;
+  }
+  header p { font-size: 14px; color: #4C5563; margin: 0; max-width: 540px; line-height: 1.55; }
+  h2 {
+    font: 600 11px/1 'JetBrains Mono', monospace;
+    letter-spacing: 1.6px; text-transform: uppercase; color: #767B87;
+    margin: 48px 0 16px; padding-bottom: 12px; border-bottom: 1px solid #E5E7EB;
+  }
+  .row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .card {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+    padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .card .preview {
+    width: 100%; aspect-ratio: 1 / 1;
+    display: flex; align-items: center; justify-content: center;
+    background: #F1F2F4; border-radius: 8px;
+  }
+  .card .preview img { max-width: 70%; max-height: 70%; }
+  .card .preview.light { background: #fff; border: 1px solid #E5E7EB; }
+  .card .preview.dark { background: #0E1726; }
+  .card .name { font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .card .meta { font: 500 9px/1.4 'JetBrains Mono', monospace; color: #767B87; text-align: center; letter-spacing: 0.4px; }
+
+  /* Species cards use currentColor */
+  .species-preview { color: #0E1726; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  .species-preview.on-blue { color: #fff; background: #0052CC; }
+  .species-preview.on-soft { color: #0052CC; background: #E1ECFB; }
+
+  /* Application samples */
+  .apps { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .app-sample {
+    background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .phone-icon {
+    width: 110px; height: 110px; border-radius: 24px; overflow: hidden;
+    box-shadow: 0 12px 32px rgba(14,23,38,0.18);
+  }
+
+  .avatar-demo { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #E1ECFB; color: #0052CC;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #fff; box-shadow: 0 2px 6px rgba(14,23,38,0.08);
+  }
+  .avatar svg { width: 36px; height: 36px; }
+
+  pre {
+    background: #0E1726; color: #B8D4FF; padding: 12px; border-radius: 8px;
+    font: 400 11px/1.55 'JetBrains Mono', monospace;
+    overflow-x: auto; margin: 0;
+  }
+  .note {
+    background: #E1ECFB; border-left: 3px solid #0052CC;
+    padding: 12px 14px; border-radius: 4px; font-size: 13px; color: #003D99; line-height: 1.55;
+    margin: 16px 0 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">Handoff · Assets</div>
+    <h1>Icono y especies</h1>
+    <p>Todos los SVGs quedan en <code>handoff/assets/</code>. El icono tiene tres variantes: coloreado (iOS/Android app icon), monocromo claro (watchOS / notificaciones), y wordmark (correos, encabezados, material impreso).</p>
+  </header>
+
+  <!-- APP ICON -->
+  <h2>App Icon</h2>
+  <div class="apps">
+    <div class="app-sample">
+      <div class="phone-icon"><img src="assets/icon/app-icon.svg" style="width:100%;height:100%;display:block" alt=""></div>
+      <div>
+        <div style="font-size:13px;font-weight:600;text-align:center">Primary</div>
+        <div class="meta" style="text-align:center">app-icon.svg · 1024×1024</div>
+      </div>
+    </div>
+    <div class="app-sample">
+      <div class="phone-icon" style="background:#fff;border:1px solid #E5E7EB"><img src="assets/icon/app-icon-light.svg" style="width:100%;height:100%;display:block" alt=""></div>
+      <div>
+        <div style="font-size:13px;font-weight:600;text-align:center">Light</div>
+        <div class="meta" style="text-align:center">app-icon-light.svg · monocromo</div>
+      </div>
+    </div>
+    <div class="app-sample" style="grid-column: span 2; align-items:flex-start">
+      <img src="assets/icon/wordmark.svg" style="max-width:100%;height:auto" alt="">
+      <div style="width:100%">
+        <div style="font-size:13px;font-weight:600">Wordmark</div>
+        <div class="meta">wordmark.svg · para headers, emails y print</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Concepto:</strong> huella geométrica con muesca de ECG integrada en el pad central ("signo vital veterinario"). La traza ECG de fondo refuerza el tono clínico. Paleta primary #0052CC alineada al DESIGN.md.
+  </div>
+
+  <!-- SPECIES -->
+  <h2>Especies · Avatares SVG</h2>
+
+  <div class="row">
+    <div class="card">
+      <div class="preview species-preview"><img src="assets/species/dog.svg" alt=""></div>
+      <div class="name">Perro</div>
+      <div class="meta">dog.svg · 64×64</div>
+    </div>
+    <div class="card">
+      <div class="preview species-preview"><img src="assets/species/cat.svg" alt=""></div>
+      <div class="name">Gato</div>
+      <div class="meta">cat.svg · 64×64</div>
+    </div>
+    <div class="card">
+      <div class="preview species-preview"><img src="assets/species/rabbit.svg" alt=""></div>
+      <div class="name">Conejo · exótico</div>
+      <div class="meta">rabbit.svg · 64×64</div>
+    </div>
+    <div class="card">
+      <div class="preview species-preview"><img src="assets/species/bird.svg" alt=""></div>
+      <div class="name">Ave · exótico</div>
+      <div class="meta">bird.svg · 64×64</div>
+    </div>
+  </div>
+
+  <div class="note">
+    Los SVG usan <code>stroke="currentColor"</code> — se tiñen automáticamente con el <code>color</code> del contenedor. Funcionan en cualquier fondo y se integran con el sistema de color del theme.
+  </div>
+
+  <!-- USAGE IN AVATAR -->
+  <h2>Uso como Avatar</h2>
+  <div class="apps">
+    <div class="app-sample">
+      <div style="font-size:13px;font-weight:600">Fondo accent (primary)</div>
+      <div class="avatar-demo">
+        <div class="avatar" style="background:#0052CC;color:#fff"><img src="assets/species/dog.svg"/></div>
+        <div class="avatar" style="background:#0052CC;color:#fff"><img src="assets/species/cat.svg"/></div>
+        <div class="avatar" style="background:#0052CC;color:#fff"><img src="assets/species/rabbit.svg"/></div>
+        <div class="avatar" style="background:#0052CC;color:#fff"><img src="assets/species/bird.svg"/></div>
+      </div>
+    </div>
+
+    <div class="app-sample">
+      <div style="font-size:13px;font-weight:600">Fondo accent soft</div>
+      <div class="avatar-demo">
+        <div class="avatar"><img src="assets/species/dog.svg"/></div>
+        <div class="avatar"><img src="assets/species/cat.svg"/></div>
+        <div class="avatar"><img src="assets/species/rabbit.svg"/></div>
+        <div class="avatar"><img src="assets/species/bird.svg"/></div>
+      </div>
+    </div>
+
+    <div class="app-sample">
+      <div style="font-size:13px;font-weight:600">Estado crítico (urgent)</div>
+      <div class="avatar-demo">
+        <div class="avatar" style="background:#FAE2E4;color:#D73A49;border-color:#D73A49"><img src="assets/species/dog.svg"/></div>
+        <div class="avatar" style="background:#FAE2E4;color:#D73A49;border-color:#D73A49"><img src="assets/species/cat.svg"/></div>
+        <div class="avatar" style="background:#FAE2E4;color:#D73A49;border-color:#D73A49"><img src="assets/species/rabbit.svg"/></div>
+        <div class="avatar" style="background:#FAE2E4;color:#D73A49;border-color:#D73A49"><img src="assets/species/bird.svg"/></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLUTTER USAGE -->
+  <h2>Integración Flutter</h2>
+  <pre>// pubspec.yaml — declara la carpeta
+flutter:
+  assets:
+    - assets/species/
+    - assets/icon/
+
+// widget — usa flutter_svg
+import 'package:flutter_svg/flutter_svg.dart';
+
+class PetAvatar extends StatelessWidget {
+  final String species; // 'dog' | 'cat' | 'rabbit' | 'bird'
+  final Color tint;
+  const PetAvatar({required this.species, this.tint = AppColors.primary});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56, height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primarySoft,
+      ),
+      child: Center(
+        child: SvgPicture.asset(
+          'assets/species/$species.svg',
+          width: 36, height: 36,
+          colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+        ),
+      ),
+    );
+  }
+}</pre>
+
+  <div class="note">
+    <strong>Para iOS app icon:</strong> Xcode requiere PNG en múltiples resoluciones. Usa un exportador (ej. <a href="https://www.appicon.co" target="_blank" style="color:#003D99">appicon.co</a>) o Figma para generar el set completo a partir de <code>app-icon.svg</code>. Tamaños necesarios: 20pt, 29pt, 40pt, 60pt, 76pt, 83.5pt, 1024pt — todos en @1x @2x @3x.
+  </div>
+
+  <!-- DIRECTORY STRUCTURE -->
+  <h2>Estructura de archivos</h2>
+  <pre>handoff/
+└── assets/
+    ├── icon/
+    │   ├── app-icon.svg          ← 1024×1024, para iOS/Android
+    │   ├── app-icon-light.svg    ← monocromo, fondos oscuros
+    │   └── wordmark.svg          ← logo horizontal con tagline
+    └── species/
+        ├── dog.svg               ← canino
+        ├── cat.svg               ← felino
+        ├── rabbit.svg            ← exótico · lagomorfo
+        └── bird.svg              ← exótico · ave</pre>
+
+</div>
+</body>
+</html>

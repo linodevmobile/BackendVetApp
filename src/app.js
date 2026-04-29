@@ -38,6 +38,8 @@ app.get('/', (req, res) => {
         create: 'POST /patients',
         get: 'GET /patients/:id',
         update: 'PATCH /patients/:id',
+        timeline: 'GET /patients/:id/timeline?type=&limit=&offset=',
+        measurements: 'GET /patients/:id/measurements?metric=weight_kg&limit=&offset=',
         favorites_list: 'GET /patients/favorites',
         favorite_add: 'POST /patients/favorites/:patient_id',
         favorite_remove: 'DELETE /patients/favorites/:patient_id',
