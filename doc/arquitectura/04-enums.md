@@ -1,4 +1,4 @@
-> Última actualización: 2026-04-29 · Schema: v2.3
+> Última actualización: 2026-04-29 · Schema: v2.5
 
 # 04 — Tipos enumerados (ENUMs)
 
@@ -115,6 +115,32 @@ Por qué se pausa la consulta.
 | `info` | Informativa (preferencia, dato útil) |
 | `warning` | Atención (alergia leve, condición a vigilar) |
 | `critical` | Crítica (alergia anafiláctica, condición que altera el manejo) |
+
+### `preventive_care_kind`
+
+| Valor | Significado |
+|---|---|
+| `vaccination` | Vacuna (core o opcional) |
+| `deworming_internal` | Desparasitación interna (oral, antihelmínticos) |
+| `deworming_external` | Desparasitación externa (pulgas, garrapatas) |
+
+> Separadas internas vs externas porque manejan productos, frecuencias y recordatorios distintos.
+
+### `preventive_care_mode`
+
+| Valor | Significado |
+|---|---|
+| `plan` | Aplicada siguiendo el catálogo sugerido (WSAVA + regional) |
+| `manual` | Registrada manualmente fuera del plan estándar |
+
+### `attachment_category`
+
+| Valor | Significado |
+|---|---|
+| `laboratory` | Resultados de laboratorio |
+| `image` | Imágenes diagnósticas o fotos |
+| `prescription` | Recetas |
+| `other` | Otros (consentimientos, certificados, cartillas) |
 
 ## Enums Fase 2 (sin endpoints aún)
 

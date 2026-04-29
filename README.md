@@ -102,6 +102,10 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 - `DELETE /patients/favorites/:patient_id`
 - `POST /patients/:patient_id/alerts`, `GET /patients/:patient_id/alerts`
 - `PATCH /patient-alerts/:id/deactivate`, `DELETE /patient-alerts/:id`
+- `GET /patients/:id/preventive-care?kind=&upcoming=&days=&limit=&offset=` — vacunas + desparasitaciones aplicadas o programadas. `upcoming=true` filtra por `next_due_at` dentro de `days` (default 90). Cada item trae `status` derivado: `ok|soon|overdue|pending|applied`.
+- `POST /patients/:id/preventive-care` — `{ kind: vaccination|deworming_internal|deworming_external, name, product?, applied_at?, next_due_at?, mode: plan|manual, consultation_id?, notes? }`. Debe traer al menos una de `applied_at` o `next_due_at`. Si trae `applied_at`, `applied_by_vet_id` se setea desde JWT.
+- `PATCH /patients/:id/preventive-care/:event_id` — actualiza `name`, `product`, `applied_at`, `next_due_at`, `mode`, `consultation_id`, `notes`.
+- `GET /patients/:id/preventive-care/suggested-plan` — proyecta plan WSAVA + regional Colombia según `species` + life_stage del paciente, cruzado con su historial. Items incluyen `applied: bool` y `next_due_at` proyectado. Catálogo en `src/data/preventive_care_plans.json`.
 
 ### Appointments
 - `GET /appointments/today`
@@ -206,3 +210,6 @@ Render auto-despliega desde la rama configurada. Antes del primer deploy contra 
 
 Para DBs existentes que no se pueden resetear, hay scripts en `migrations/`:
 - `migrations/v2.2_sections.sql` — actualiza el enum `clinical_section`: elimina `presumptive_diagnosis`/`definitive_diagnosis`, agrega `clinical_diagnosis`, `food`, `vitals`, `treatment`. Migra filas existentes (merge automático cuando un mismo consultation tiene presuntivo + definitivo). Idempotente: aborta si ya se aplicó.
+- `migrations/v2.3_patient_measurements.sql` — agrega tabla `patient_measurements` (peso, vitales, BCS) + trigger que sincroniza `patients.weight_kg` como caché de la última medición. Idempotente.
+- `migrations/v2.4_attachments.sql` — renombra `consultation_attachments` → `attachments`, lifts NOT NULL de `consultation_id`, agrega `patient_id` (NOT NULL) + `category` enum, trigger que autorrellena `patient_id` desde `consultation_id`. Idempotente.
+- `migrations/v2.5_preventive_care.sql` — agrega tabla `patient_preventive_care` (vacunas + desparasitaciones internas/externas unificadas) + enums `preventive_care_kind`, `preventive_care_mode`. RLS por paciente del vet. Catálogo de plan sugerido (no en DB) vive en `src/data/preventive_care_plans.json`. Idempotente.

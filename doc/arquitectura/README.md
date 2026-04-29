@@ -1,4 +1,4 @@
-> Última actualización: 2026-04-29 · Schema: v2.3
+> Última actualización: 2026-04-29 · Schema: v2.5
 
 # Arquitectura BackendVetApp — Referencia técnica
 

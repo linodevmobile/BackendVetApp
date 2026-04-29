@@ -1,4 +1,4 @@
-> Última actualización: 2026-04-29 · Schema: v2.3
+> Última actualización: 2026-04-29 · Schema: v2.5
 
 # 02 — Modelo Entidad-Relación (MER)
 
@@ -18,6 +18,7 @@ erDiagram
     patients ||--o{ consultations : "subject_of"
     patients ||--o{ appointments : "scheduled_for"
     patients ||--o{ patient_measurements : "measured"
+    patients ||--o{ patient_preventive_care : "vaccinated_dewormed"
     patients ||--o{ medical_orders : "receives"
     patients ||--o{ hospitalizations : "admitted"
     patients ||--o{ files : "owns_files"

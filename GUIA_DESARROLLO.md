@@ -189,7 +189,8 @@ src/
 ├── middlewares/      # auth, responseWrapper, errorHandler, validate, upload, requestId, rateLimiters
 ├── validators/       # authSchema, patientSchema, consultationSchema, aiSchema, appointmentSchema, alertSchema, attachmentSchema
 ├── controllers/      # auth, veterinarian, patient, consultation, ai, appointment, dashboard, attachment, alert
-├── repositories/     # patientsRepo, consultationsRepo, sectionsRepo, appointmentsRepo, favoritesRepo, alertsRepo, attachmentsRepo
+├── data/             # preventive_care_plans.json (catálogo WSAVA + regional CO)
+├── repositories/     # patientsRepo, consultationsRepo, sectionsRepo, appointmentsRepo, favoritesRepo, alertsRepo, attachmentsRepo, measurementsRepo, hospitalizationsRepo, preventiveCareRepo
 ├── services/         # llmService, promptRouter, transcriptionService, storageService
 ├── prompts/          # 9 prompts clínicos (secciones con IA) + _shared/transcriptionRules.js
 ├── routes/           # authRoutes, patientRoutes, consultationRoutes, consultationsCollectionRoutes, aiRoutes, appointmentRoutes, veterinarianRoutes, alertRoutes

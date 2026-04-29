@@ -279,6 +279,53 @@
             "description": "Elimina alerta permanentemente. Requiere `id` de la alerta.",
             "url": "{{base_url}}/patient-alerts/:id"
           }
+        },
+        {
+          "name": "Preventive Care — List",
+          "request": {
+            "method": "GET",
+            "description": "Lista vacunas + desparasitaciones del paciente.\n\n## Query\n| Param | Tipo | Default | Valores |\n|---|---|---|---|\n| `kind` | enum | — | `vaccination` \\| `deworming_internal` \\| `deworming_external` |\n| `upcoming` | bool | `false` | si `true`, filtra por `next_due_at` dentro de `days` |\n| `days` | int | 90 | ventana de upcoming |\n| `limit` | int | 50 | 1-200 |\n| `offset` | int | 0 | ≥0 |\n\nCada item trae `status` derivado: `ok` (>30d), `soon` (≤30d), `overdue` (<now), `pending` (sin `applied_at` y sin `next_due_at`), `applied` (sin `next_due_at`).",
+            "url": {
+              "raw": "{{base_url}}/patients/{{patient_id}}/preventive-care?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["patients", "{{patient_id}}", "preventive-care"],
+              "query": [
+                { "key": "kind", "value": "vaccination", "disabled": true },
+                { "key": "upcoming", "value": "true", "disabled": true },
+                { "key": "days", "value": "90", "disabled": true },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Preventive Care — Create",
+          "request": {
+            "method": "POST",
+            "description": "Registra vacuna o desparasitación.\n\n## Body JSON\n| Campo | Tipo | Requerido | Valores |\n|---|---|---|---|\n| `kind` | enum | sí | `vaccination` \\| `deworming_internal` \\| `deworming_external` |\n| `name` | string | sí | ej: \"Antirrábica\", \"Bravecto\" |\n| `product` | string | no | marca/lote |\n| `applied_at` | date (YYYY-MM-DD) | * | * Debe traer al menos uno de `applied_at` o `next_due_at` |\n| `next_due_at` | date | * | siguiente refuerzo |\n| `mode` | enum | no | `plan` \\| `manual` (default `manual`) |\n| `consultation_id` | uuid | no | si se aplicó en consulta |\n| `notes` | string | no | |\n\nSi se manda `applied_at`, `applied_by_vet_id` se setea desde el JWT.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"kind\": \"vaccination\",\n  \"name\": \"Antirrábica\",\n  \"product\": \"Nobivac Rabia\",\n  \"applied_at\": \"2026-04-29\",\n  \"next_due_at\": \"2027-04-29\",\n  \"mode\": \"manual\",\n  \"notes\": \"Refuerzo anual\"\n}" },
+            "url": "{{base_url}}/patients/{{patient_id}}/preventive-care"
+          }
+        },
+        {
+          "name": "Preventive Care — Update",
+          "request": {
+            "method": "PATCH",
+            "description": "Actualiza un evento (re-programar, marcar aplicada, ajustar producto/notas).\n\n## Body JSON (todos opcionales, al menos uno)\n`name`, `product`, `applied_at`, `next_due_at`, `mode`, `consultation_id`, `notes`.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"next_due_at\": \"2027-05-15\",\n  \"notes\": \"Reprogramado\"\n}" },
+            "url": "{{base_url}}/patients/{{patient_id}}/preventive-care/:event_id"
+          }
+        },
+        {
+          "name": "Preventive Care — Suggested Plan",
+          "request": {
+            "method": "GET",
+            "description": "Plan sugerido WSAVA + adaptación regional Colombia, según `species` y life_stage del paciente (calculado de `date_of_birth`).\n\nDevuelve items con:\n- `kind`, `group` (`core` / `optional`)\n- Para vacunas: `code`, `name`, `description`, `legal_required`, `puppy_schedule_weeks`, `adult_interval_months`\n- Para desparasitaciones: `name`, `products_examples`, `adult_interval_months` o `adult_interval_days`\n- `applied_at`, `next_due_at`, `applied: bool` — cruzando con `patient_preventive_care`\n\nCatálogo en `src/data/preventive_care_plans.json`. No requiere fila previa en DB.",
+            "url": "{{base_url}}/patients/{{patient_id}}/preventive-care/suggested-plan"
+          }
         }
       ]
     },

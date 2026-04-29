@@ -1,4 +1,4 @@
-> Última actualización: 2026-04-29 · Schema: v2.3
+> Última actualización: 2026-04-29 · Schema: v2.5
 
 # 03 — Catálogo de tablas
 
@@ -175,6 +175,29 @@ Cita programada. Puede materializar en una consulta.
 | `status` | `appointment_status` | NOT NULL DEFAULT `'scheduled'` | enum: `scheduled`/`now`/`completed`/`cancelled` |
 | `urgent` | BOOLEAN | NOT NULL DEFAULT `false` | |
 | `consultation_id` | UUID | FK `consultations(id) ON DELETE SET NULL` | |
+
+### `patient_preventive_care`
+
+Vacunas + desparasitaciones (internas/externas) por paciente. Unificada porque comparten shape (`name`, `applied_at`, `next_due_at`) y la UI las mezcla en "Próximos recordatorios".
+
+| Columna | Tipo | Constraints | Notas |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `patient_id` | UUID | NOT NULL · FK ON DELETE CASCADE | |
+| `kind` | `preventive_care_kind` | NOT NULL | enum: `vaccination`/`deworming_internal`/`deworming_external` |
+| `name` | TEXT | NOT NULL | "Polivalente DHPPi-L", "Antirrábica", "Bravecto"… |
+| `product` | TEXT | | Marca/lote opcional |
+| `applied_at` | DATE | | Null si solo programada/recomendada |
+| `next_due_at` | DATE | | Siguiente refuerzo |
+| `mode` | `preventive_care_mode` | NOT NULL DEFAULT `'manual'` | enum: `plan`/`manual`. `plan` = aplicada siguiendo el catálogo sugerido |
+| `applied_by_vet_id` | UUID | FK `veterinarians(id)` | Auto-set desde JWT cuando hay `applied_at` |
+| `consultation_id` | UUID | FK `consultations(id) ON DELETE SET NULL` | Vincula con la consulta donde se aplicó |
+| `notes` | TEXT | | |
+| `created_at`, `updated_at` | TIMESTAMPTZ | NOT NULL DEFAULT now() | `updated_at` por trigger |
+
+CHECK: al menos una de `applied_at`/`next_due_at` debe estar presente.
+
+> El "plan sugerido" NO vive en DB. Es un catálogo estático en `src/data/preventive_care_plans.json` (WSAVA + adaptación regional Colombia para perro/gato). El endpoint `GET /patients/:id/preventive-care/suggested-plan` proyecta ese catálogo según `species` + life_stage del paciente y lo cruza con esta tabla para flag `applied: bool`.
 
 ## Fase 2 (hospitalización — placeholders)
 
