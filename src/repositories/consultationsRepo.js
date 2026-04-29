@@ -36,7 +36,7 @@ async function getById(supabase, vetId, id) {
       *,
       patient:patients ( id, name, species, breed, sex, weight_kg, owner_name ),
       sections:consultation_sections ( * ),
-      attachments:consultation_attachments ( * )
+      attachments:attachments ( * )
     `)
     .eq('id', id)
     .eq('veterinarian_id', vetId)

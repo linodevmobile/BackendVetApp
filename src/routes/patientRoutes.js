@@ -1,6 +1,7 @@
 const express = require('express');
 const ctrl = require('../controllers/patientController');
 const measurementsCtrl = require('../controllers/measurementsController');
+const upload = require('../middlewares/upload');
 const validate = require('../middlewares/validate');
 const {
   createSchema,
@@ -8,6 +9,10 @@ const {
   listQuerySchema,
   measurementsListQuerySchema,
   timelineListQuerySchema,
+  hospitalizationsQuerySchema,
+  appointmentsQuerySchema,
+  attachmentsQuerySchema,
+  attachmentUploadSchema,
 } = require('../validators/patientSchema');
 
 const router = express.Router();
@@ -23,5 +28,14 @@ router.patch('/:id', validate({ body: updateSchema }), ctrl.update);
 
 router.get('/:id/timeline', validate({ query: timelineListQuerySchema }), ctrl.timeline);
 router.get('/:id/measurements', validate({ query: measurementsListQuerySchema }), measurementsCtrl.listByPatient);
+router.get('/:id/hospitalizations', validate({ query: hospitalizationsQuerySchema }), ctrl.listHospitalizations);
+router.get('/:id/appointments', validate({ query: appointmentsQuerySchema }), ctrl.listAppointments);
+router.get('/:id/attachments', validate({ query: attachmentsQuerySchema }), ctrl.listAttachments);
+router.post(
+  '/:id/attachments',
+  upload.single('file'),
+  validate({ body: attachmentUploadSchema }),
+  ctrl.uploadAttachmentForPatient
+);
 
 module.exports = router;
