@@ -60,4 +60,24 @@ async function remove(supabase, vetId, appointmentId) {
   if (error) throw error;
 }
 
-module.exports = { listTodayForVet, create, update, remove };
+async function listByPatient(supabase, patientId, { upcoming = true, limit = 20, offset = 0 } = {}) {
+  let query = supabase
+    .from('appointments')
+    .select('id, scheduled_at, reason, status, urgent, consultation_id', { count: 'exact' })
+    .eq('patient_id', patientId);
+
+  if (upcoming) {
+    query = query
+      .gte('scheduled_at', new Date().toISOString())
+      .in('status', ['scheduled', 'now'])
+      .order('scheduled_at', { ascending: true });
+  } else {
+    query = query.order('scheduled_at', { ascending: false });
+  }
+
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+  if (error) throw error;
+  return { items: data || [], total: count || 0 };
+}
+
+module.exports = { listTodayForVet, listByPatient, create, update, remove };

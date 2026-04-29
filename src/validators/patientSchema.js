@@ -56,10 +56,36 @@ const timelineListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
+const hospitalizationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const appointmentsQuerySchema = z.object({
+  upcoming: z.coerce.boolean().optional().default(true),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const attachmentsQuerySchema = z.object({
+  category: z.enum(['laboratory', 'image', 'prescription', 'other']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const attachmentUploadSchema = z.object({
+  category: z.enum(['laboratory', 'image', 'prescription', 'other']),
+  label: z.string().optional(),
+});
+
 module.exports = {
   createSchema,
   updateSchema,
   listQuerySchema,
   measurementsListQuerySchema,
   timelineListQuerySchema,
+  hospitalizationsQuerySchema,
+  appointmentsQuerySchema,
+  attachmentsQuerySchema,
+  attachmentUploadSchema,
 };

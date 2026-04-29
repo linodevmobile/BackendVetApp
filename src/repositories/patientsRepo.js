@@ -14,7 +14,31 @@ function decorate(patient, extras = {}) {
     has_alert: extras.has_alert || false,
     is_favorite: extras.is_favorite || false,
     visits_count: extras.visits_count ?? null,
+    latest_bcs: extras.latest_bcs ?? null,
+    latest_temperature_c: extras.latest_temperature_c ?? null,
+    latest_heart_rate_bpm: extras.latest_heart_rate_bpm ?? null,
+    latest_respiratory_rate_rpm: extras.latest_respiratory_rate_rpm ?? null,
+    latest_measured_at: extras.latest_measured_at ?? null,
   };
+}
+
+// Walk recent measurements (newest first) and pick the first non-null value per metric.
+function pickLatestVitals(rows) {
+  const out = {
+    latest_bcs: null,
+    latest_temperature_c: null,
+    latest_heart_rate_bpm: null,
+    latest_respiratory_rate_rpm: null,
+    latest_measured_at: null,
+  };
+  for (const r of rows || []) {
+    if (out.latest_bcs == null && r.bcs != null) out.latest_bcs = r.bcs;
+    if (out.latest_temperature_c == null && r.temperature_c != null) out.latest_temperature_c = r.temperature_c;
+    if (out.latest_heart_rate_bpm == null && r.heart_rate_bpm != null) out.latest_heart_rate_bpm = r.heart_rate_bpm;
+    if (out.latest_respiratory_rate_rpm == null && r.respiratory_rate_rpm != null) out.latest_respiratory_rate_rpm = r.respiratory_rate_rpm;
+    if (out.latest_measured_at == null) out.latest_measured_at = r.measured_at;
+  }
+  return out;
 }
 
 async function create(supabase, vetId, payload) {
@@ -70,7 +94,7 @@ async function getById(supabase, vetId, id) {
     .single();
   if (error) throw error;
 
-  const [{ data: alerts }, { data: fav }, { data: last }, { count: visitsCount }] = await Promise.all([
+  const [{ data: alerts }, { data: fav }, { data: last }, { count: visitsCount }, { data: recentMeasurements }] = await Promise.all([
     supabase.from('patient_alerts').select('id').eq('patient_id', id).eq('active', true).limit(1),
     supabase.from('vet_favorite_patients').select('patient_id').eq('vet_id', vetId).eq('patient_id', id).maybeSingle(),
     supabase
@@ -86,6 +110,12 @@ async function getById(supabase, vetId, id) {
       .select('id', { count: 'exact', head: true })
       .eq('patient_id', id)
       .eq('status', 'signed'),
+    supabase
+      .from('patient_measurements')
+      .select('measured_at, bcs, temperature_c, heart_rate_bpm, respiratory_rate_rpm')
+      .eq('patient_id', id)
+      .order('measured_at', { ascending: false })
+      .limit(20),
   ]);
 
   return decorate(data, {
@@ -93,6 +123,7 @@ async function getById(supabase, vetId, id) {
     is_favorite: !!fav,
     last_visit: last?.signed_at || null,
     visits_count: visitsCount ?? 0,
+    ...pickLatestVitals(recentMeasurements),
   });
 }
 
@@ -188,13 +219,12 @@ async function timeline(supabase, vetId, patientId, { type = 'all', limit = 20, 
 
   if (type === 'all' || type === 'attachment') {
     const { data: attachments, error } = await supabase
-      .from('consultation_attachments')
+      .from('attachments')
       .select(`
-        id, label, mime_type, storage_path, section, created_at,
-        consultation:consultations!inner ( id, signed_at, status, patient_id )
+        id, label, mime_type, storage_path, section, category, created_at,
+        consultation:consultations ( id, signed_at, status )
       `)
-      .eq('consultation.patient_id', patientId)
-      .eq('consultation.status', 'signed');
+      .eq('patient_id', patientId);
     if (error) throw error;
 
     for (const a of attachments || []) {
@@ -206,7 +236,7 @@ async function timeline(supabase, vetId, patientId, { type = 'all', limit = 20, 
         doc: null,
         tone: 'neutral',
         ref_id: a.consultation?.id || null,
-        meta: { section: a.section, mime_type: a.mime_type },
+        meta: { section: a.section, category: a.category, mime_type: a.mime_type },
       });
     }
   }
