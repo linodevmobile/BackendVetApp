@@ -73,4 +73,18 @@ async function listFavorites(req, res, next) {
   }
 }
 
-module.exports = { create, getById, list, update, addFavorite, removeFavorite, listFavorites };
+async function timeline(req, res, next) {
+  try {
+    const { type, limit, offset } = req.query;
+    const result = await patientsRepo.timeline(req.supabase, req.veterinarianId, req.params.id, {
+      type,
+      limit,
+      offset,
+    });
+    return res.ok(result.items, { total: result.total, limit, offset, type });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { create, getById, list, update, addFavorite, removeFavorite, listFavorites, timeline };

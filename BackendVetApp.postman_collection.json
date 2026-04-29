@@ -182,10 +182,44 @@
           "name": "Update",
           "request": {
             "method": "PATCH",
-            "description": "Actualiza paciente. Al menos un campo requerido.\n\n## Body JSON (todos opcionales)\n`name`, `species`, `breed`, `sex`, `date_of_birth`, `weight_kg`, `microchip`, `owner_name`, `owner_phone`, `owner_email`, `owner_address`.",
+            "description": "Actualiza paciente. Al menos un campo requerido.\n\n## Body JSON (todos opcionales)\n`name`, `species`, `breed`, `sex`, `date_of_birth`, `microchip`, `owner_name`, `owner_phone`, `owner_email`, `owner_address`.\n\n**Nota:** `weight_kg` ya NO se acepta aquí. El peso se registra vía `vitals` en consulta y se sincroniza a `patient_measurements` al firmar (el campo `patients.weight_kg` queda como caché auto-actualizado por trigger).",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"weight_kg\": 19.0,\n  \"owner_address\": \"Carrera 7 #12-34\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"owner_address\": \"Carrera 7 #12-34\"\n}" },
             "url": "{{base_url}}/patients/{{patient_id}}"
+          }
+        },
+        {
+          "name": "Timeline",
+          "request": {
+            "method": "GET",
+            "description": "Timeline cronológico del paciente: consultas firmadas + adjuntos. Para el tab Historia de la pantalla de detalle.\n\n## Query\n| Param | Tipo | Default | Valores |\n|---|---|---|---|\n| `type` | enum | `all` | `all` \\| `consultation` \\| `attachment` |\n| `limit` | int | 20 | 1-100 |\n| `offset` | int | 0 | ≥0 |\n\n## Respuesta\nLista de eventos `{ id, kind, when, title, doc, tone, ref_id, meta }` ordenados desc por fecha.",
+            "url": {
+              "raw": "{{base_url}}/patients/{{patient_id}}/timeline?type=all&limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["patients", "{{patient_id}}", "timeline"],
+              "query": [
+                { "key": "type", "value": "all" },
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Measurements",
+          "request": {
+            "method": "GET",
+            "description": "Histórico de mediciones del paciente para gráficas (peso, temperatura, FC, FR, BCS).\n\n## Query\n| Param | Tipo | Default | Valores |\n|---|---|---|---|\n| `metric` | enum | `weight_kg` | `weight_kg` \\| `temperature_c` \\| `heart_rate_bpm` \\| `respiratory_rate_rpm` \\| `bcs` |\n| `limit` | int | 50 | 1-200 |\n| `offset` | int | 0 | ≥0 |\n\nFiltra automáticamente por mediciones donde la métrica solicitada no es null. Source: consultation (auto-sincronizado al firmar) o manual (peso al alta).",
+            "url": {
+              "raw": "{{base_url}}/patients/{{patient_id}}/measurements?metric=weight_kg&limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["patients", "{{patient_id}}", "measurements"],
+              "query": [
+                { "key": "metric", "value": "weight_kg" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
           }
         },
         {
